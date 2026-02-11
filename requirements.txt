@@ -1,0 +1,13 @@
+python-dotenv
+flask
+flask_sqlalchemy
+pymysql
+
+flask_cors
+
+numpy>=1.24.0,<2.0.0
+rapidfuzz
+metaphone
+indic-transliteration
+Flask-Caching
+flask-compress

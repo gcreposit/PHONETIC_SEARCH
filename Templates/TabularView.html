@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Voter Master Reporting</title>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        .fade-in {
+            animation: fadeIn 0.4s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .scale-hover:hover {
+            transform: scale(1.02);
+            transition: 0.2s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-indigo-100 via-blue-100 to-purple-100 text-gray-800">
+
+<!-- Loader -->
+<div id="pageLoader" class="fixed inset-0 bg-white/70 backdrop-blur-sm hidden flex items-center justify-center z-50">
+    <div class="flex flex-col items-center">
+        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <div class="mt-4 font-semibold text-blue-600">Processing Data...</div>
+    </div>
+</div>
+
+<div class="px-6 py-6">
+
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold">🚀 Voter Data Dashboard</h1>
+        <p class="text-gray-600">Universal access to Nagar Nigam, Gram Panchayat, and PDF Extracts</p>
+    </div>
+
+    <!-- Tabs -->
+    <!-- Tabs -->
+    <div class="flex justify-center gap-4 mb-6">
+        <button data-endpoint="nagar-nigam"
+                class="tab-btn px-6 py-2 rounded-full font-semibold shadow-md transition bg-blue-600 text-white">
+            Nagar Nigam
+        </button>
+
+        <button data-endpoint="gram-panchayat-voters"
+                class="tab-btn px-6 py-2 rounded-full font-semibold shadow-md transition bg-white">
+            Gram Panchayat
+        </button>
+
+        <button data-endpoint="voters-pdf-extract"
+                class="tab-btn px-6 py-2 rounded-full font-semibold shadow-md transition bg-white">
+            Voters PDF
+        </button>
+    </div>
+
+
+    <!-- Card -->
+    <div class="bg-white rounded-2xl shadow-xl p-6">
+
+        <!-- Search -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+
+            <div class="flex items-center bg-gray-100 rounded-full px-4 py-2 w-full md:w-1/2 shadow-inner">
+                <input type="text"
+                       id="searchInput"
+                       placeholder="Enter name or voter ID..."
+                       onkeypress="handleSearch(event)"
+                       class="bg-transparent outline-none w-full px-2 py-1"/>
+                <button onclick="triggerSearch()"
+                        class="bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition">
+                    Search
+                </button>
+            </div>
+
+            <div>
+                <span class="px-4 py-2 bg-gray-100 rounded-full shadow">
+                    Total Records: <span id="totalCount" class="font-bold">0</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-auto max-h-[60vh] border rounded-lg fade-in">
+            <table class="min-w-full text-sm text-left">
+                <thead class="sticky top-0 bg-gray-100 text-gray-700">
+                <tr>
+                    <th class="px-3 py-2">SR. NO</th>
+                    <th class="px-3 py-2">VOTER NAME</th>
+                    <th class="px-3 py-2">FATHER / HUSBAND / MOTHER</th>
+                    <th class="px-3 py-2">GENDER</th>
+                    <th class="px-3 py-2">AGE</th>
+                    <th class="px-3 py-2">LOCALITY</th>
+                    <th class="px-3 py-2">CENTER NUM</th>
+                    <th class="px-3 py-2">CENTER NAME</th>
+                </tr>
+                </thead>
+                <tbody id="tableBody">
+                <tr>
+                    <td colspan="8" class="text-center py-10 text-gray-400">
+                        Click a tab or search to load data
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex justify-between items-center mt-6">
+            <select id="limitSelect" onchange="changeLimit()"
+                    class="border px-3 py-1 rounded-md shadow-sm">
+                <option value="100" selected>100 per page</option>
+                <option value="500">500 per page</option>
+                <option value="1000">1000 per page</option>
+            </select>
+
+            <div class="flex items-center gap-3">
+                <button onclick="changePage(-1)"
+                        class="px-4 py-1 bg-gray-200 rounded-md hover:bg-gray-300 transition">
+                    Previous
+                </button>
+
+                <span class="text-gray-600">
+                    Page <span id="currentPage">1</span>
+                </span>
+
+                <button onclick="changePage(1)"
+                        class="px-4 py-1 bg-gray-200 rounded-md hover:bg-gray-300 transition">
+                    Next
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    let currentEndpoint = 'nagar-nigam';
+    let currentPage = 1;
+    let currentLimit = 100;
+    let isSearching = false;
+
+    function showLoader(show) {
+        document.getElementById('pageLoader').style.display = show ? 'flex' : 'none';
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+
+            // Remove active style from all
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('bg-blue-600', 'text-white');
+                el.classList.add('bg-white');
+            });
+
+            // Add active style
+            this.classList.remove('bg-white');
+            this.classList.add('bg-blue-600', 'text-white');
+
+            currentEndpoint = this.dataset.endpoint;
+            currentPage = 1;
+            document.getElementById("searchInput").value = "";
+            isSearching = false;
+
+            fetchData();
+        });
+    });
+
+
+    function changePage(step) {
+        if (isSearching) return;
+        if (currentPage + step < 1) return;
+        currentPage += step;
+        fetchData();
+    }
+
+    function changeLimit() {
+        if (isSearching) return;
+        currentLimit = document.getElementById('limitSelect').value;
+        currentPage = 1;
+        fetchData();
+    }
+
+    function handleSearch(e) {
+        if (e.key === 'Enter') triggerSearch();
+    }
+
+    function triggerSearch() {
+        const query = document.getElementById('searchInput').value.trim();
+
+        if (!query) {
+            isSearching = false;
+            fetchData();
+            return;
+        }
+
+        isSearching = true;
+
+        let searchUrl = "";
+        if (currentEndpoint === "nagar-nigam")
+            searchUrl = `/api/pysearch/nagar-nigam?q=${encodeURIComponent(query)}`;
+        else if (currentEndpoint === "gram-panchayat-voters")
+            searchUrl = `/api/pysearch/gram-panchayat?q=${encodeURIComponent(query)}`;
+        else
+            searchUrl = `/api/pysearch/voter-pdf?q=${encodeURIComponent(query)}`;
+
+        console.log("searchUrl ", searchUrl)
+        executeFetch(searchUrl);
+    }
+
+    function fetchData() {
+        const url = `/api/${currentEndpoint}?page=${currentPage}&limit=${currentLimit}`;
+        executeFetch(url);
+    }
+
+    function executeFetch(url) {
+        showLoader(true);
+        fetch(url)
+            .then(res => res.json())
+            .then(res => {
+                renderTable(res.data);
+                document.getElementById('totalCount').innerText =
+                    res.total_records || res.total || res.total_matches || res.data.length;
+                document.getElementById('currentPage').innerText = currentPage;
+                showLoader(false);
+            })
+            .catch(err => {
+                console.error(err);
+                showLoader(false);
+                alert("Error loading data.");
+            });
+    }
+
+    function renderTable(data) {
+        const body = document.getElementById('tableBody');
+        body.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            body.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-gray-400">No records found</td></tr>';
+            return;
+        }
+
+        data.forEach((row, index) => {
+            body.innerHTML += `
+                <tr class="hover:bg-blue-50 transition fade-in">
+                    <td class="px-3 py-2">${index + 1}</td>
+                    <td class="px-3 py-2">${row.voter_name || '-'}</td>
+                    <td class="px-3 py-2">${row.father_husband_mother_name || '-'}</td>
+                    <td class="px-3 py-2">${row.gender || '-'}</td>
+                    <td class="px-3 py-2">${row.age || '-'}</td>
+                    <td class="px-3 py-2">${row.locality_name || row.polling_location_name || '-'}</td>
+                    <td class="px-3 py-2">${row.polling_center_num || '-'}</td>
+                    <td class="px-3 py-2">${row.polling_center_name || '-'}</td>
+                </tr>
+            `;
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        const tabs = document.querySelectorAll('.tab-btn');
+
+        tabs.forEach(btn => {
+            btn.addEventListener('click', function () {
+
+                // Remove active style from all
+                tabs.forEach(el => {
+                    el.classList.remove('bg-blue-600', 'text-white');
+                    el.classList.add('bg-white');
+                });
+
+                // Add active style to clicked tab
+                this.classList.remove('bg-white');
+                this.classList.add('bg-blue-600', 'text-white');
+
+                currentEndpoint = this.dataset.endpoint;
+                currentPage = 1;
+                document.getElementById("searchInput").value = "";
+                isSearching = false;
+
+                fetchData();
+            });
+        });
+
+        // 🔥 Auto click first tab on load
+        tabs[0].click();
+    });
+</script>
+
+</body>
+</html>
