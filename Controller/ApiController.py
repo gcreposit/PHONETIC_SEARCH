@@ -85,3 +85,23 @@ def get_voters_pdf_extract():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ----------------------------------------
+# Voters Data
+# ----------------------------------------
+@api_bp.route("/voters-data", methods=["GET"])
+def get_voters_data():
+    page = int(request.args.get("page", 1))
+    limit = int(request.args.get("limit", 1000))
+
+    try:
+        data, total = get_paginated_data("voter_data", page, limit)
+        return jsonify({
+            "page": page,
+            "limit": limit,
+            "total_records": total,
+            "data": data
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8"/>
     <title>Voter Master Reporting</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
     <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -30,12 +31,47 @@
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-indigo-100 via-blue-100 to-purple-100 text-gray-800">
+<!-- Advanced Icon Loader -->
+<div id="pageLoader"
+     class="fixed inset-0 bg-white/70 backdrop-blur-sm hidden flex items-center justify-center z-50">
 
-<!-- Loader -->
-<div id="pageLoader" class="fixed inset-0 bg-white/70 backdrop-blur-sm hidden flex items-center justify-center z-50">
-    <div class="flex flex-col items-center">
-        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <div class="mt-4 font-semibold text-blue-600">Processing Data...</div>
+    <div class="bg-white rounded-2xl shadow-xl px-10 py-8 flex flex-col items-center gap-6">
+
+        <!-- Animated Icons -->
+        <div class="flex items-center gap-6">
+
+            <!-- Search -->
+            <div class="flex flex-col items-center animate-bounce">
+                <div class="w-14 h-14 flex items-center justify-center rounded-full bg-blue-100">
+                    🔍
+                </div>
+                <span class="text-xs mt-2 text-gray-600">Searching</span>
+            </div>
+
+            <!-- Analyzing -->
+            <div class="flex flex-col items-center animate-pulse">
+                <div class="w-14 h-14 flex items-center justify-center rounded-full bg-purple-100">
+                    🧠
+                </div>
+                <span class="text-xs mt-2 text-gray-600">Analyzing</span>
+            </div>
+
+            <!-- Filtering -->
+            <div class="flex flex-col items-center animate-bounce delay-150">
+                <div class="w-14 h-14 flex items-center justify-center rounded-full bg-green-100">
+                    🗂
+                </div>
+                <span class="text-xs mt-2 text-gray-600">Filtering</span>
+            </div>
+
+        </div>
+
+        <!-- Status Text -->
+        <div id="loaderText"
+             class="text-blue-600 font-semibold text-lg animate-pulse">
+            Processing Data...
+        </div>
+
     </div>
 </div>
 
@@ -64,6 +100,11 @@
                 class="tab-btn px-6 py-2 rounded-full font-semibold shadow-md transition bg-white">
             Voters PDF
         </button>
+
+        <button data-endpoint="voters-data"
+                class="tab-btn px-6 py-2 rounded-full font-semibold shadow-md transition bg-white hidden">
+            Voters Data
+        </button>
     </div>
 
 
@@ -71,8 +112,36 @@
     <div class="bg-white rounded-2xl shadow-xl p-6">
 
         <!-- Search -->
-        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <!--        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">-->
 
+        <!--            <div class="flex items-center bg-gray-100 rounded-full px-4 py-2 w-full md:w-1/2 shadow-inner">-->
+        <!--                <input type="text"-->
+        <!--                       id="searchInput"-->
+        <!--                       placeholder="Enter name or voter ID..."-->
+        <!--                       onkeypress="handleSearch(event)"-->
+        <!--                       class="bg-transparent outline-none w-full px-2 py-1"/>-->
+        <!--                <button onclick="triggerSearch()"-->
+        <!--                        class="bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition">-->
+        <!--                    Search-->
+        <!--                </button>-->
+        <!--            </div>-->
+        <!--<div class="flex justify-end mb-4">-->
+        <!--    <button onclick="smartExportExcel()"-->
+        <!--            class="bg-green-600 text-white px-5 py-2 rounded-full hover:bg-green-700 transition">-->
+        <!--        Export Excel-->
+        <!--    </button>-->
+        <!--</div>-->
+
+        <!--            <div>-->
+        <!--                <span class="px-4 py-2 bg-gray-100 rounded-full shadow">-->
+        <!--                    Total Records: <span id="totalCount" class="font-bold">0</span>-->
+        <!--                </span>-->
+        <!--            </div>-->
+        <!--        </div>-->
+        <!-- Search + Export + Total -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+
+            <!-- 🔍 Search -->
             <div class="flex items-center bg-gray-100 rounded-full px-4 py-2 w-full md:w-1/2 shadow-inner">
                 <input type="text"
                        id="searchInput"
@@ -85,17 +154,29 @@
                 </button>
             </div>
 
-            <div>
+            <!-- 📊 Right Side Controls -->
+            <div class="flex items-center gap-4">
+
+                <!-- Export Button -->
+                <button onclick="smartExportExcel()"
+                        class="bg-green-600 text-white px-5 py-2 rounded-full hover:bg-green-700 transition">
+                    Export Excel
+                </button>
+
+                <!-- Total Records -->
                 <span class="px-4 py-2 bg-gray-100 rounded-full shadow">
-                    Total Records: <span id="totalCount" class="font-bold">0</span>
-                </span>
+            Total Records: <span id="totalCount" class="font-bold">0</span>
+        </span>
+
             </div>
+
         </div>
 
         <!-- Table -->
         <div class="overflow-auto max-h-[60vh] border rounded-lg fade-in">
             <table class="min-w-full text-sm text-left">
-                <thead class="sticky top-0 bg-gray-100 text-gray-700">
+
+                <thead id="tableHead" class="sticky top-0 bg-gray-100 text-gray-700">
                 <tr>
                     <th class="px-3 py-2">SR. NO</th>
                     <th class="px-3 py-2">VOTER NAME</th>
@@ -107,6 +188,7 @@
                     <th class="px-3 py-2">CENTER NAME</th>
                 </tr>
                 </thead>
+
                 <tbody id="tableBody">
                 <tr>
                     <td colspan="8" class="text-center py-10 text-gray-400">
@@ -213,6 +295,8 @@
             searchUrl = `/api/pysearch/nagar-nigam?q=${encodeURIComponent(query)}`;
         else if (currentEndpoint === "gram-panchayat-voters")
             searchUrl = `/api/pysearch/gram-panchayat?q=${encodeURIComponent(query)}`;
+        else if (currentEndpoint === "voters-data")
+            searchUrl = `/api/pysearch/voters-data?q=${encodeURIComponent(query)}`;
         else
             searchUrl = `/api/pysearch/voter-pdf?q=${encodeURIComponent(query)}`;
 
@@ -225,12 +309,16 @@
         executeFetch(url);
     }
 
+    let currentTableData = []; // stores last fetched data
+
     function executeFetch(url) {
         showLoader(true);
         fetch(url)
             .then(res => res.json())
             .then(res => {
-                renderTable(res.data);
+                currentTableData = res.data || []; // ✅ store full dataset
+
+                renderTable(currentTableData);
                 document.getElementById('totalCount').innerText =
                     res.total_records || res.total || res.total_matches || res.data.length;
                 document.getElementById('currentPage').innerText = currentPage;
@@ -245,28 +333,98 @@
 
     function renderTable(data) {
         const body = document.getElementById('tableBody');
+        const head = document.getElementById('tableHead');
+
         body.innerHTML = '';
 
         if (!data || data.length === 0) {
-            body.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-gray-400">No records found</td></tr>';
+            body.innerHTML =
+                '<tr><td colspan="8" class="text-center py-6 text-gray-400">No records found</td></tr>';
             return;
         }
 
-        data.forEach((row, index) => {
-            body.innerHTML += `
+        let rowsHTML = "";
+
+        // 🔥 VOTERS DATA TAB
+        if (currentEndpoint === "voters-data") {
+
+            head.innerHTML = `
+            <tr>
+                <th class="px-3 py-2">SR. NO</th>
+                <th class="px-3 py-2">VOTER ID</th>
+                <th class="px-3 py-2">NAME (HINDI)</th>
+                <th class="px-3 py-2">NAME (ENGLISH)</th>
+                <th class="px-3 py-2">CASTE</th>
+                <th class="px-3 py-2">AGE</th>
+                        <th class="px-3 py-2">Mobile Number</th>
+                <th class="px-3 py-2">RELATION NAME (HINDI)</th>
+                <th class="px-3 py-2">RELATION NAME (ENG)</th>
+
+                <th class="px-3 py-2">SECTION</th>
+            </tr>
+        `;
+
+            for (let i = 0; i < data.length; i++) {
+                const row = data[i];
+
+                rowsHTML += `
                 <tr class="hover:bg-blue-50 transition fade-in">
-                    <td class="px-3 py-2">${index + 1}</td>
-                    <td class="px-3 py-2">${row.voter_name || '-'}</td>
-                    <td class="px-3 py-2">${row.father_husband_mother_name || '-'}</td>
-                    <td class="px-3 py-2">${row.gender || '-'}</td>
+                    <td class="px-3 py-2">${i + 1}</td>
+                     <td class="px-3 py-2">${row.voter_i_card_no || '-'}</td>
+                    <td class="px-3 py-2">${row.e_name || '-'}</td>
+                    <td class="px-3 py-2">${row.e_name_eng || '-'}</td>
+                    <td class="px-3 py-2">${row.caste || '-'}</td>
                     <td class="px-3 py-2">${row.age || '-'}</td>
-                    <td class="px-3 py-2">${row.locality_name || row.polling_location_name || '-'}</td>
-                    <td class="px-3 py-2">${row.polling_center_num || '-'}</td>
-                    <td class="px-3 py-2">${row.polling_center_name || '-'}</td>
+                         <td class="px-3 py-2">${row.mobile_number || '-'}</td>
+                    <td class="px-3 py-2">${row.rel_name || '-'}</td>
+                    <td class="px-3 py-2">${row.rel_name_eng || '-'}</td>
+
+                    <td class="px-3 py-2">${row.section || '-'}</td>
                 </tr>
             `;
-        });
+            }
+
+            body.innerHTML = rowsHTML;  // ✅ Inject once
+            return;
+        }
+
+        // 🔥 DEFAULT TABLE
+        head.innerHTML = `
+        <tr>
+            <th class="px-3 py-2">SR. NO</th>
+            <th class="px-3 py-2">VOTER NAME</th>
+            <th class="px-3 py-2">FATHER / HUSBAND / MOTHER</th>
+            <th class="px-3 py-2">GENDER</th>
+            <th class="px-3 py-2">AGE</th>
+
+            <th class="px-3 py-2">LOCALITY</th>
+            <th class="px-3 py-2">CENTER NUM</th>
+            <th class="px-3 py-2">CENTER NAME</th>
+
+        </tr>
+    `;
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+
+            rowsHTML += `
+            <tr class="hover:bg-blue-50 transition fade-in">
+                <td class="px-3 py-2">${i + 1}</td>
+                <td class="px-3 py-2">${row.voter_name || '-'}</td>
+                <td class="px-3 py-2">${row.father_husband_mother_name || '-'}</td>
+                <td class="px-3 py-2">${row.gender || '-'}</td>
+                <td class="px-3 py-2">${row.age || '-'}</td>
+
+                <td class="px-3 py-2">${row.locality_name || row.polling_location_name || '-'}</td>
+                <td class="px-3 py-2">${row.polling_center_num || '-'}</td>
+                <td class="px-3 py-2">${row.polling_center_name || '-'}</td>
+            </tr>
+        `;
+        }
+
+        body.innerHTML = rowsHTML;  // ✅ Inject once
     }
+
 
     document.addEventListener("DOMContentLoaded", function () {
 
@@ -297,6 +455,64 @@
         // 🔥 Auto click first tab on load
         tabs[0].click();
     });
+
+    function smartExportExcel() {
+
+        if (!currentTableData || currentTableData.length === 0) {
+            alert("No data to export.");
+            return;
+        }
+
+        showLoader(true);
+
+        setTimeout(() => {
+
+            let exportData = [];
+
+            if (currentEndpoint === "voters-data") {
+
+                exportData = currentTableData.map((row, index) => ({
+                    "SR NO": index + 1,
+                    "VOTER ID": row.voter_i_card_no || '',
+                    "NAME (HINDI)": row.e_name || '',
+                    "NAME (ENGLISH)": row.e_name_eng || '',
+                    "CASTE": row.caste || '',
+                    "AGE": row.age || '',
+                    "MOBILE": row.mobile_number || '',
+                    "RELATION NAME (HINDI)": row.rel_name || '',
+                    "RELATION NAME (ENG)": row.rel_name_eng || '',
+                    "SECTION": row.section || ''
+                }));
+
+            } else {
+
+                exportData = currentTableData.map((row, index) => ({
+                    "SR NO": index + 1,
+                    "VOTER NAME": row.voter_name || '',
+                    "FATHER/HUSBAND/MOTHER": row.father_husband_mother_name || '',
+                    "GENDER": row.gender || '',
+                    "AGE": row.age || '',
+                    "LOCALITY": row.locality_name || row.polling_location_name || '',
+                    "CENTER NUM": row.polling_center_num || '',
+                    "CENTER NAME": row.polling_center_name || ''
+                }));
+
+            }
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Voter Report");
+
+            const fileName = `Voter_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+            XLSX.writeFile(wb, fileName);
+
+            showLoader(false);
+
+        }, 100);
+    }
+
+
 </script>
 
 </body>
