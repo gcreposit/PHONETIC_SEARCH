@@ -11,3 +11,4 @@ metaphone
 indic-transliteration
 Flask-Caching
 flask-compress
+cryptography
