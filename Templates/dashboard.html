@@ -1,0 +1,1355 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex items-center justify-between gap-4 mb-6">
+  <div class="flex items-center gap-4">
+    <!-- Animated Logo -->
+    <div class="logo-container">
+        <div class="relative inline-flex items-center justify-center">
+          <!-- Orange Aura -->
+          <span class="absolute inset-0 rounded-full blur-xl bg-orange-400 opacity-70"></span>
+            <!-- Logo Image -->
+            <img src="/static/image/rajesh.png" alt="Logo" class="logo-img relative z-10 border-2 border-white rounded-full p-0 shadow-lg bg-white" width="80" height="80" />
+</div>
+
+    </div>
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight">Sarojini Nagar Vidhansbha Voters</h1>
+      <p class="text-white/70">Interactive analytics for voting_db.voter_data</p>
+    </div>
+  </div>
+
+  <div class="glass rounded-2xl p-3 flex items-center gap-3">
+    <label class="text-sm text-white/80">Mapping Filter</label>
+    <select id="mappingFilter" class="rounded-xl px-3 py-2 text-slate-900 font-medium">
+      <option value="all">All</option>
+      <option value="mapped">Mapped (NULL treated as mapped)</option>
+      <option value="unmapped">Unmapped</option>
+    </select>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+  <div class="glass rounded-2xl p-5">
+    <div class="text-white/70 text-sm">Total Persons</div>
+    <div id="totalRecords" class="text-4xl font-bold mt-2">—</div>
+  </div>
+  <div class="glass rounded-2xl p-5">
+    <div class="text-white/70 text-sm">Gender Distribution</div>
+    <div id="genderBadges" class="flex flex-wrap gap-2 mt-3"></div>
+  </div>
+  <div class="glass rounded-2xl p-5">
+    <div class="text-white/70 text-sm">Caste Distribution</div>
+    <div id="casteBadges" class="flex flex-wrap gap-2 mt-3"></div>
+  </div>
+  <div class="glass rounded-2xl p-5">
+    <div class="text-white/70 text-sm">Avg Age (numeric only)</div>
+    <div id="avgAge" class="text-4xl font-bold mt-2">—</div>
+  </div>
+</div>
+
+<!-- Mapped/Unmapped Distribution Bar -->
+<div class="glass rounded-2xl p-5 mb-6">
+  <h2 class="text-lg font-semibold mb-3">Mapping Status Distribution</h2>
+  <div class="flex justify-between items-center mb-2">
+    <div class="flex gap-4">
+      <span class="text-sm">
+        <span class="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
+        Mapped: <span id="mappedCount" class="font-semibold">0</span> (<span id="mappedPercent">0</span>%)
+      </span>
+      <span class="text-sm">
+        <span class="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
+        Unmapped: <span id="unmappedCount" class="font-semibold">0</span> (<span id="unmappedPercent">0</span>%)
+      </span>
+    </div>
+  </div>
+  <div class="w-full bg-white/10 rounded-full h-10 overflow-hidden flex">
+    <div id="mappedBar" class="bg-gradient-to-r from-green-500 to-emerald-600 h-full transition-all duration-500 flex items-center justify-center" style="width: 0%">
+      <span class="text-xs font-bold text-white" id="mappedBarLabel"></span>
+    </div>
+    <div id="unmappedBar" class="bg-gradient-to-r from-orange-500 to-red-600 h-full transition-all duration-500 flex items-center justify-center" style="width: 0%">
+      <span class="text-xs font-bold text-white" id="unmappedBarLabel"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+  <div class="glass rounded-2xl p-5 lg:col-span-3">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold">Age Distribution (with Gender Split)</h2>
+      <span class="text-xs text-white/60">18+ buckets</span>
+    </div>
+    <div id="ageGenderChart"></div>
+  </div>
+
+  <div class="glass rounded-2xl p-5">
+    <h2 class="text-lg font-semibold mb-3">Gender Distribution</h2>
+    <div id="genderDonut"></div>
+  </div>
+
+  <div class="glass rounded-2xl p-5 lg:col-span-2">
+    <h2 class="text-lg font-semibold mb-3">Caste Distribution</h2>
+    <div id="casteChart"></div>
+  </div>
+
+  <div class="glass rounded-2xl p-5 lg:col-span-2">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold">Booth Distribution</h2>
+      <input id="boothSearch" type="text" placeholder="Search booth..." class="rounded-xl px-3 py-2 text-sm text-slate-900 font-medium" />
+    </div>
+    <div class="overflow-auto" style="max-height: 320px;">
+      <table id="boothTable" class="w-full text-sm">
+        <thead class="sticky top-0 glass">
+          <tr>
+            <th class="px-3 py-2 text-left">Booth No</th>
+            <th class="px-3 py-2 text-right">Count</th>
+            <th class="px-3 py-2 text-right">%</th>
+          </tr>
+        </thead>
+        <tbody id="boothTableBody">
+          <tr><td colspan="3" class="text-center py-4 text-white/60">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal (Chart drilldown) - FULLSCREEN -->
+<div id="dataModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm">
+  <div class="h-full w-full p-4 flex flex-col">
+    <div class="glass rounded-2xl p-4 flex-1 flex flex-col max-h-full">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 id="modalTitle" class="text-xl font-bold">Filtered Records</h3>
+          <div class="text-white/60 text-xs">Click close to exit fullscreen</div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="exportModalData('excel')" class="glass rounded-xl px-4 py-2 text-sm font-semibold hover:scale-105 transition">Export Excel</button>
+          <button onclick="exportModalData('pdf')" class="glass rounded-xl px-4 py-2 text-sm font-semibold hover:scale-105 transition">Export/Print PDF</button>
+          <button onclick="closeModal()" class="glass rounded-xl px-4 py-2 text-sm font-semibold hover:scale-105 transition">Close</button>
+        </div>
+      </div>
+
+      <!-- Modal Table Controls -->
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <div class="flex items-center gap-2">
+          <input id="modalSearch" type="text" placeholder="Search in results..." class="rounded-xl px-3 py-2 text-slate-900 font-medium" />
+          <button onclick="searchModalTable()" class="glass rounded-xl px-4 py-2 text-sm font-semibold">Search</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-white/70">Show:</span>
+          <select id="modalPageSize" onchange="changeModalPageSize()" class="rounded-xl px-3 py-2 text-slate-900 font-medium">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-auto">
+        <table id="modalTable" class="w-full text-sm">
+          <thead class="sticky top-0 glass">
+            <tr>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('id')">Id <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('ac_no')">Ac <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('part_no')">Part <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('sl_no_in_part')">SL <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('voter_i_card_no')">Voter Id <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('e_name')">Hindi Name <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('rel_name')">Hindi Rel <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('e_name_eng')">Eng Name <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('rel_name_eng')">Eng Rel <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('house_no')">House <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('age')">Age <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('sex')">Gender <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('section')">Booth No <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('mapping_status')">Mapping <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('caste')">Caste <span class="sort-icon">⇅</span></th>
+              <th class="px-3 py-2 text-left cursor-pointer" onclick="sortModalTable('mobile_no')">Mobile <span class="sort-icon">⇅</span></th>
+            </tr>
+          </thead>
+          <tbody id="modalTableBody">
+            <tr><td colspan="16" class="text-center py-8 text-white/60">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Modal Pagination -->
+      <div id="modalPagination" class="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
+        <div class="text-sm text-white/70">
+          Showing <span id="modalShowingStart">0</span> to <span id="modalShowingEnd">0</span> of <span id="modalTotalRecords">0</span>
+        </div>
+        <div id="modalPaginationButtons" class="flex gap-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="glass rounded-2xl p-5">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+    <div>
+      <h2 class="text-lg font-semibold">Records Table</h2>
+      <span class="text-xs text-white/60">Search • Sort • Pagination • Export All Data</span>
+    </div>
+
+    <div class="flex flex-wrap gap-2 items-center">
+      <!-- Extra Filters -->
+      <select id="genderFilter" class="rounded-xl px-3 py-2 text-slate-900 font-medium">
+        <option value="all">Gender: All</option>
+        <option value="Male">Gender: Male</option>
+        <option value="Female">Gender: Female</option>
+        <option value="Third">Gender: Other</option>
+        <option value="Unknown">Gender: Unknown</option>
+      </select>
+
+      <select id="casteFilter" class="rounded-xl px-3 py-2 text-slate-900 font-medium">
+          <option value="all">Caste: All</option>
+          <option value="General">General</option>
+          <option value="OBC">OBC</option>
+          <option value="SC / ST">SC / ST</option>
+          <option value="Muslim">Muslim</option>
+          <option value="Yadav">Yadav</option>
+          <option value="Others">Others</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+
+      <input id="ageMin" type="number" min="0" max="120" placeholder="Age Min" class="rounded-xl px-3 py-2 w-24 text-slate-900 font-medium" />
+      <input id="ageMax" type="number" min="0" max="120" placeholder="Age Max" class="rounded-xl px-3 py-2 w-24 text-slate-900 font-medium" />
+
+<!--      <input id="tableSearch" type="text" placeholder="Search..." class="rounded-xl px-3 py-2 text-slate-900 font-medium" />-->
+      <div>
+            <label class="block text-xs text-white/60 mb-1 ml-1">Search In</label>
+            <select id="searchColumn" class="w-full rounded-xl px-3 py-2 bg-white text-slate-900 font-medium">
+                <option value="wildcard">Wildcard (All Names)</option>
+                <option value="voter_i_card_no">Voter ID Card</option>
+                <option value="e_name">Voter Name (Hindi)</option>
+                <option value="rel_name">Relative Name (Hindi)</option>
+                <option value="e_name_eng">Voter Name (Eng)</option>
+                <option value="rel_name_eng">Relative Name (Eng)</option>
+                <option value="house_no">House No</option>
+            </select>
+        </div>
+
+        <div class="md:col-span-2">
+            <label class="block text-xs text-white/60 mb-1 ml-1">Search Term</label>
+            <input type="text" id="voterSearch" placeholder="Enter keywords..."
+                   class="w-full rounded-xl px-4 py-2 bg-white text-slate-900" />
+        </div>
+
+      <button id="applyFiltersBtn" class="glass rounded-xl px-4 py-2 text-sm font-semibold hover:scale-[1.01] transition">Apply</button>
+      <button id="resetFiltersBtn" class="glass rounded-xl px-4 py-2 text-sm font-semibold hover:scale-[1.01] transition">Reset</button>
+
+      <button onclick="exportTableData('excel')" class="glass rounded-xl px-4 py-2 text-sm font-semibold hover:scale-[1.01] transition">Export Excel</button>
+      <button onclick="exportTableData('pdf')" class="glass rounded-xl px-4 py-2 text-sm font-semibold hover:scale-[1.01] transition">Export/Print PDF</button>
+    </div>
+  </div>
+
+  <div class="overflow-auto">
+    <table id="voterTable" class="w-full text-sm">
+      <thead class="glass sticky top-0">
+        <!-- Group header row -->
+        <tr>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('id')">Id <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('ac_no')">Ac_No <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('part_no')">Part No <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('sl_no_in_part')">SL No <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('voter_i_card_no')">Voter Id Card No <span class="sort-icon">⇅</span></th>
+
+          <th colspan="2" class="px-3 py-2 text-center border-l border-white/10">Hindi (हिंदी)</th>
+          <th colspan="2" class="px-3 py-2 text-center border-l border-white/10">English (अंग्रेज़ी)</th>
+
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer border-l border-white/10" onclick="sortMainTable('house_no')">House No <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('age')">Age <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('sex')">Gender <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('section')">Booth No <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('mapping_status')">Mapping Status <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('caste')">Caste <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('mobile_no')">Mobile No <span class="sort-icon">⇅</span></th>
+          <th rowspan="2" class="px-3 py-2 text-center">Actions</th>
+        </tr>
+
+        <!-- Actual columns row -->
+        <tr>
+          <th class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('e_name')">Voter Name <span class="sort-icon">⇅</span></th>
+          <th class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('rel_name')">Relative Name <span class="sort-icon">⇅</span></th>
+
+          <th class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('e_name_eng')">Voter Name <span class="sort-icon">⇅</span></th>
+          <th class="px-3 py-2 text-left cursor-pointer" onclick="sortMainTable('rel_name_eng')">Relative Name <span class="sort-icon">⇅</span></th>
+        </tr>
+      </thead>
+      <tbody id="voterTableBody">
+        <tr><td colspan="17" class="text-center py-8 text-white/60">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination Controls -->
+  <div class="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+    <div class="flex items-center gap-2">
+      <span class="text-sm text-white/70">Show:</span>
+      <select id="pageSize" onchange="changePageSize()" class="rounded-xl px-3 py-2 text-slate-900 font-medium">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="all">All</option>
+      </select>
+
+    </div>
+    <div class="flex items-center justify-between mt-4 bg-black/20 p-4 rounded-xl">
+      <div class="text-sm text-white/70">
+        Showing <span id="showingStart" class="font-bold text-white">0</span>
+        to <span id="showingEnd" class="font-bold text-white">0</span>
+        of <span id="totalRecords2" class="font-bold text-white">0</span> records
+      </div>
+      <div id="paginationButtons" class="flex gap-2"></div>
+    </div>
+     <div class="flex items-center justify-between bg-slate-800/50 p-2 rounded-xl">
+        <div class="text-sm text-white/70 mx-3">
+            Showing page <span id="currentPageNum" class="text-white font-bold">1</span>
+        </div>
+        <div class="flex gap-2">
+            <button id="prevPage" class="px-2 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition">Previous</button>
+            <button id="nextPage" class="px-2 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition">Next</button>
+        </div>
+
+     </div>
+
+  </div>
+</div>
+
+<div id="globalLoader" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] transition-opacity duration-300">
+  <div class="flex flex-col items-center gap-3 glass p-6 rounded-2xl shadow-2xl">
+    <div class="w-12 h-12 border-4 border-white/20 border-t-orange-500 rounded-full animate-spin"></div>
+    <p class="text-white font-medium animate-pulse">Loading data...</p>
+  </div>
+</div>
+
+<div id="toastContainer" class="fixed bottom-5 right-5 z-[100] flex flex-col gap-3"></div>
+
+
+<script>
+  let ageGenderChart, genderDonutChart, casteChart;
+  let currentPage = 1;
+  let currentPageSize = 10;
+  let currentSort = { column: 'id', direction: 'desc' };
+  let currentFilters = {};
+  let allBooths = [];
+
+  let modalPage = 1;
+  let modalPageSize = 10;
+  let modalSort = { column: 'id', direction: 'desc' };
+  let modalFilters = {};
+
+  function getMapping() {
+    return document.getElementById("mappingFilter").value;
+  }
+
+  async function fetchJSON(url) {
+      toggleLoader(true); // Show loader before request
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Server error");
+        const data = await res.json();
+        return data;
+      } catch (err) {
+        showToast("Failed to fetch data", "error");
+        return { data: [], total: 0 };
+      } finally {
+        toggleLoader(false); // Hide loader regardless of success/fail
+      }
+  }
+
+  function badge(text, value) {
+    return `<span class="px-3 py-1 rounded-full text-xs glass">${text}: <b>${value}</b></span>`;
+  }
+
+  async function loadSummary() {
+    const mapping = getMapping();
+    const params = new URLSearchParams({ mapping, ...getFilters() });
+    const data = await fetchJSON(`/api/summary?${params}`);
+
+    document.getElementById("totalRecords").innerText = (data.total ?? 0).toLocaleString();
+    document.getElementById("avgAge").innerText = data.avg_age ? Number(data.avg_age).toFixed(1) : "—";
+
+    // Gender badges
+    const genderBadges = (data.gender || []).map(g => {
+      const displayGender = g.gender === 'Third' ? 'Other' : g.gender;
+      return badge(displayGender, g.cnt);
+    }).join("");
+    document.getElementById("genderBadges").innerHTML = genderBadges || `<span class="text-white/60 text-sm">No data</span>`;
+
+    // Caste badges - show top 3
+    const casteBadges = (data.caste || []).slice(0, 10).map(c => badge(c.caste_bucket, c.cnt)).join("");
+    document.getElementById("casteBadges").innerHTML = casteBadges || `<span class="text-white/60 text-sm">No data</span>`;
+
+    // Gender donut
+    const labels = (data.gender || []).map(x => x.gender === 'Third' ? 'Other' : x.gender);
+    const series = (data.gender || []).map(x => x.cnt);
+    if (genderDonutChart) {
+      genderDonutChart.updateOptions({ labels });
+      genderDonutChart.updateSeries(series);
+    }
+
+    // Mapping status distribution
+    await loadMappingDistribution();
+  }
+
+  async function loadMappingDistribution() {
+    const data = await fetchJSON(`/api/summary?mapping=all&${new URLSearchParams(getFilters())}`);
+
+    let mapped = 0;
+    let unmapped = 0;
+    const total = data.total || 0;
+
+    // Get mapping breakdown from backend
+    const mappingData = await fetchJSON(`/api/mapping_distribution?${new URLSearchParams(getFilters())}`);
+
+    if (mappingData && mappingData.data) {
+      mappingData.data.forEach(item => {
+        if (item.mapping_status === 'unmapped') {
+          unmapped = item.cnt;
+        } else {
+          mapped += item.cnt;
+        }
+      });
+    }
+
+    const mappedPercent = total > 0 ? ((mapped / total) * 100).toFixed(1) : 0;
+    const unmappedPercent = total > 0 ? ((unmapped / total) * 100).toFixed(1) : 0;
+
+    document.getElementById('mappedCount').textContent = mapped.toLocaleString();
+    document.getElementById('mappedPercent').textContent = mappedPercent;
+    document.getElementById('unmappedCount').textContent = unmapped.toLocaleString();
+    document.getElementById('unmappedPercent').textContent = unmappedPercent;
+
+    document.getElementById('mappedBar').style.width = mappedPercent + '%';
+    document.getElementById('unmappedBar').style.width = unmappedPercent + '%';
+
+    // Show percentage label only if segment is wide enough
+    document.getElementById('mappedBarLabel').textContent = mappedPercent > 5 ? mappedPercent + '%' : '';
+    document.getElementById('unmappedBarLabel').textContent = unmappedPercent > 5 ? unmappedPercent + '%' : '';
+  }
+
+  async function loadAgeGenderChart() {
+    const mapping = getMapping();
+    const params = new URLSearchParams({ mapping, ...getFilters() });
+    const rows = await fetchJSON(`/api/age_gender?${params}`);
+
+    const categories = rows.map(r => r.age_bucket);
+    const male = rows.map(r => r.male);
+    const female = rows.map(r => r.female);
+    const other = rows.map(r => r.other);
+
+    const options = {
+      chart: { type: 'bar', height: 340, stacked: false, toolbar: { show: false } },
+      series: [
+        { name: 'Male', data: male },
+        { name: 'Female', data: female },
+        { name: 'Other/Unknown', data: other },
+      ],
+      xaxis: { categories },
+      plotOptions: { bar: { borderRadius: 10, columnWidth: '55%' } },
+      dataLabels: { enabled: false },
+      grid: { borderColor: 'rgba(255,255,255,0.12)' },
+      theme: { mode: 'dark' },
+      legend: { position: 'top' }
+    };
+
+    if (!ageGenderChart) {
+      ageGenderChart = new ApexCharts(document.querySelector("#ageGenderChart"), options);
+      ageGenderChart.render();
+    } else {
+      ageGenderChart.updateOptions({ xaxis: { categories } });
+      ageGenderChart.updateSeries(options.series);
+    }
+  }
+
+  function initGenderDonut() {
+    const options = {
+      chart: { type: 'donut', height: 320 },
+      series: [0],
+      labels: ['—'],
+      dataLabels: { enabled: true },
+      legend: { position: 'bottom' },
+      theme: { mode: 'dark' }
+    };
+    genderDonutChart = new ApexCharts(document.querySelector("#genderDonut"), options);
+    genderDonutChart.render();
+  }
+
+  async function loadCasteChart() {
+    const mapping = getMapping();
+    const params = new URLSearchParams({ mapping, ...getFilters() });
+    const rows = await fetchJSON(`/api/caste?${params}`);
+
+    const categories = rows.map(r => r.caste_bucket);
+    const series = [{ name: 'Count', data: rows.map(r => r.cnt) }];
+
+    const options = {
+      chart: {
+        type: 'bar',
+        height: 320,
+        toolbar: { show: false },
+        events: {
+          dataPointSelection: function(event, chartContext, config) {
+            const caste = chartContext.w.globals.labels[config.dataPointIndex];
+            const count = chartContext.w.globals.series[0][config.dataPointIndex];
+            loadModalWithFilters(`Caste: ${caste} (${count} voters)`, {
+              mapping: getMapping(),
+              caste: caste
+            });
+          }
+        }
+      },
+      series,
+      xaxis: {
+        categories,
+        labels: {
+          rotate: -45,
+          style: {
+            fontSize: '12px'
+          }
+        }
+      },
+      plotOptions: {
+        bar: {
+          borderRadius: 10,
+          columnWidth: '70%',
+          distributed: false
+        }
+      },
+      dataLabels: {
+        enabled: true,
+        formatter: function(val) {
+          return val.toLocaleString();
+        },
+        style: {
+          fontSize: '10px',
+          colors: ['#fff']
+        }
+      },
+      grid: { borderColor: 'rgba(255,255,255,0.12)' },
+      theme: { mode: 'dark' },
+      tooltip: {
+        y: {
+          formatter: function(val) {
+            return val.toLocaleString() + ' voters';
+          }
+        }
+      }
+    };
+
+    if (!casteChart) {
+      casteChart = new ApexCharts(document.querySelector("#casteChart"), options);
+      casteChart.render();
+    } else {
+      casteChart.updateOptions({ xaxis: { categories } });
+      casteChart.updateSeries(series);
+    }
+  }
+
+  async function loadBoothTable() {
+    const mapping = getMapping();
+    const params = new URLSearchParams({ mapping, ...getFilters() });
+    const rows = await fetchJSON(`/api/sections_all?${params}`);
+
+    allBooths = rows;
+    renderBoothTable(rows);
+  }
+
+  function renderBoothTable(booths) {
+    const tbody = document.getElementById('boothTableBody');
+
+    if (booths.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white/60">No data</td></tr>';
+      return;
+    }
+
+    const total = booths.reduce((sum, b) => sum + b.cnt, 0);
+
+    tbody.innerHTML = booths.map((booth, index) => {
+      const percent = total > 0 ? ((booth.cnt / total) * 100).toFixed(1) : 0;
+      return `
+        <tr class="border-b border-white/5 hover:bg-white/5 cursor-pointer" onclick="openBoothModal('${booth.section}', ${booth.cnt})">
+          <td class="px-3 py-2">${booth.section || 'Unknown'}</td>
+          <td class="px-3 py-2 text-right font-semibold">${booth.cnt.toLocaleString()}</td>
+          <td class="px-3 py-2 text-right text-white/70">${percent}%</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function searchBooths() {
+    const searchTerm = document.getElementById('boothSearch').value.toLowerCase();
+    const filtered = allBooths.filter(b =>
+      (b.section || '').toLowerCase().includes(searchTerm)
+    );
+    renderBoothTable(filtered);
+  }
+
+  window.openBoothModal = function(boothNo, count) {
+    const filters = {
+      mapping: getMapping(),
+      booth: boothNo,
+      ...getFilters()
+    };
+
+    loadModalWithFilters(`Booth No: ${boothNo} (${count} voters)`, filters);
+  };
+
+  function getFilters() {
+    const filters = {
+      gender: document.getElementById("genderFilter")?.value || "all",
+      caste: document.getElementById("casteFilter")?.value || "all",
+      age_min: document.getElementById("ageMin")?.value || "",
+      age_max: document.getElementById("ageMax")?.value || "",
+      search: document.getElementById("voterSearch")?.value || ""
+    };
+    return filters;
+  }
+
+  async function loadTable() {
+    const mapping = getMapping();
+    const filters = getFilters();
+
+    const searchCol = document.getElementById("searchColumn")?.value || "wildcard";
+
+    const params = new URLSearchParams({
+      mapping,
+      ...filters,
+      col: searchCol, //
+      page: currentPage,
+      page_size: currentPageSize,
+      sort_column: currentSort.column,
+      sort_direction: currentSort.direction
+    });
+
+    const response = await fetchJSON(`/api/table?${params}`);
+    renderTable(response.data);
+    updatePagination(response);
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById("voterTableBody");
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="17" class="text-center py-8 text-white/60">No records found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(row => {
+      const displaySex = row.sex === 'Third' || row.sex === 'तृतीय लिंग' ? 'Other' : row.sex;
+      return `
+      <tr class="border-b border-white/5 hover:bg-white/5" data-id="${row.id}">
+        <td class="px-3 py-2">${row.id}</td>
+        <td class="px-3 py-2">${row.ac_no || ''}</td>
+        <td class="px-3 py-2">${row.part_no || ''}</td>
+        <td class="px-3 py-2">${row.sl_no_in_part || ''}</td>
+        <td class="px-3 py-2">${row.voter_i_card_no || ''}</td>
+        <td class="px-3 py-2">${row.e_name || ''}</td>
+        <td class="px-3 py-2">${row.rel_name || ''}</td>
+        <td class="px-3 py-2">${row.e_name_eng || ''}</td>
+        <td class="px-3 py-2">${row.rel_name_eng || ''}</td>
+        <td class="px-3 py-2">${row.house_no || ''}</td>
+        <td class="px-3 py-2">${row.age || ''}</td>
+        <td class="px-3 py-2">${displaySex || ''}</td>
+        <td class="px-3 py-2">${row.section || ''}</td>
+        <td class="px-3 py-2">${row.mapping_status || ''}</td>
+        <td class="px-3 py-2">${row.caste || ''}</td>
+        <td class="px-3 py-2">${row.mobile_no || ''}</td>
+        <td class="px-3 py-2">
+          <button onclick="editRow(${row.id}, this)" class="text-xs px-2 py-1 glass rounded hover:scale-105">Edit</button>
+          <button onclick="saveRow(${row.id}, this)" class="hidden text-xs px-2 py-1 glass rounded hover:scale-105">Save</button>
+        </td>
+      </tr>
+    `;
+    }).join('');
+  }
+
+  function updatePagination(response) {
+      // --- SAFETY CHECK: Prevent "Cannot set properties of null" error ---
+      const elStart = document.getElementById("showingStart");
+      const elEnd = document.getElementById("showingEnd");
+      const elTotal = document.getElementById("totalRecords2");
+      const elCurrentPage = document.getElementById("currentPageNum");
+      const buttonsDiv = document.getElementById("paginationButtons");
+
+      if (!elStart || !elEnd || !elTotal || !buttonsDiv) {
+        console.warn("Pagination HTML elements missing (showingStart, showingEnd, etc.)");
+        return;
+      }
+
+      // 1. Convert page_size to a number.
+      let numericPageSize;
+      if (response.page_size === 'all' || response.page_size > 999999) {
+        numericPageSize = response.filtered;
+      } else {
+        numericPageSize = parseInt(response.page_size) || 10;
+      }
+
+      // 2. Calculate indices
+      const start = response.data.length > 0 ? ((response.page - 1) * numericPageSize + 1) : 0;
+      const end = response.data.length > 0 ? Math.min(response.page * numericPageSize, response.filtered) : 0;
+
+      // 3. Update UI
+      elStart.innerText = start.toLocaleString();
+      elEnd.innerText = end.toLocaleString();
+      elTotal.innerText = response.filtered.toLocaleString();
+      if (elCurrentPage) {
+        elCurrentPage.innerText = response.page;
+      }
+
+      const totalPages = response.total_pages;
+
+      // 4. Generate Buttons
+      if (totalPages <= 1) {
+        buttonsDiv.innerHTML = '';
+        return;
+      }
+
+      let buttons = `<button onclick="goToPage(1)" class="glass rounded-xl px-3 py-1 text-sm hover:scale-105" ${currentPage === 1 ? 'disabled' : ''}>First</button>`;
+      buttons += `<button onclick="goToPage(${currentPage - 1})" class="glass rounded-xl px-3 py-1 text-sm hover:scale-105" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+
+      const startPage = Math.max(1, currentPage - 2);
+      const endPage = Math.min(totalPages, currentPage + 2);
+
+      for (let i = startPage; i <= endPage; i++) {
+        buttons += `<button onclick="goToPage(${i})" class="glass rounded-xl px-3 py-1 text-sm hover:scale-105 ${i === currentPage ? 'bg-white/20' : ''}">${i}</button>`;
+      }
+
+      buttons += `<button onclick="goToPage(${currentPage + 1})" class="glass rounded-xl px-3 py-1 text-sm hover:scale-105" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+      buttons += `<button onclick="goToPage(${totalPages})" class="glass rounded-xl px-3 py-1 text-sm hover:scale-105" ${currentPage === totalPages ? 'disabled' : ''}>Last</button>`;
+
+      buttonsDiv.innerHTML = buttons;
+  }
+
+  function goToPage(page) {
+    currentPage = page;
+    loadTable();
+  }
+
+  function changePageSize() {
+    const select = document.getElementById("pageSize");
+    currentPageSize = select.value;
+    currentPage = 1;
+    loadTable();
+  }
+
+  function sortMainTable(column) {
+    if (currentSort.column === column) {
+      currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+      currentSort.column = column;
+      currentSort.direction = 'asc';
+    }
+    loadTable();
+  }
+
+  async function reloadAll() {
+    await loadSummary();
+    await loadAgeGenderChart();
+    await loadCasteChart();
+    await loadBoothTable();
+    await loadTable();
+    attachChartClicks();
+  }
+
+      // Event Listeners for Simple Pagination Buttons
+    document.getElementById("nextPage").addEventListener("click", async () => {
+        const totalPagesElem = document.getElementById("totalRecords2");
+        if (!totalPagesElem) return;
+
+        // Calculate max pages based on current page size
+        const pageSize = currentPageSize === 'all' ? 999999 : parseInt(currentPageSize) || 10;
+        const totalRecords = parseInt(totalPagesElem.textContent.replace(/,/g, '')) || 0;
+        const maxPages = Math.ceil(totalRecords / pageSize);
+
+        if (currentPage < maxPages) {
+            currentPage++;
+            await loadTable();
+        }
+    });
+
+    document.getElementById("prevPage").addEventListener("click", async () => {
+        if (currentPage > 1) {
+            currentPage--;
+            await loadTable();
+        }
+    });
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    initGenderDonut();
+    await reloadAll();
+
+    document.getElementById("mappingFilter").addEventListener("change", async () => {
+      currentPage = 1;
+      await reloadAll();
+    });
+
+    document.getElementById("applyFiltersBtn").addEventListener("click", async () => {
+      currentPage = 1;
+      await reloadAll();
+      showToast("Filters applied successfully!");
+    });
+
+    document.getElementById("resetFiltersBtn").addEventListener("click", async () => {
+      document.getElementById("genderFilter").value = "all";
+      document.getElementById("casteFilter").value = "all";
+      document.getElementById("ageMin").value = "";
+      document.getElementById("ageMax").value = "";
+      document.getElementById("voterSearch").value = "";
+      document.getElementById("searchColumn").value = "wildcard";
+      currentPage = 1;
+      await reloadAll();
+      showToast("Filters reset successfully!");
+    });
+
+    document.getElementById('boothSearch')?.addEventListener('input', searchBooths);
+  });
+
+  // Edit/Save functions
+  window.editRow = function(id, btn) {
+    const $tr = $(btn).closest("tr");
+    $tr.addClass("editing bg-yellow-500/10");
+
+    $(btn).addClass("hidden");
+    $(btn).siblings("button").removeClass("hidden");
+
+    const editableIdx = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    editableIdx.forEach(i => {
+      const td = $tr.find("td").eq(i);
+      const val = td.text().trim();
+      td.attr("data-old", val);
+      td.html(`<input class="w-full rounded-lg px-2 py-1 text-slate-900" value="${val.replace(/"/g,'&quot;')}" />`);
+    });
+  };
+
+  window.saveRow = async function(id, btn) {
+    const $tr = $(btn).closest("tr");
+
+    const getVal = (idx) => {
+      const input = $tr.find("td").eq(idx).find("input");
+      return input.length ? input.val().trim() : $tr.find("td").eq(idx).text().trim();
+    };
+
+    const payload = {
+      id,
+      e_name: getVal(5),
+      rel_name: getVal(6),
+      e_name_eng: getVal(7),
+      rel_name_eng: getVal(8),
+      house_no: getVal(9),
+      age: getVal(10),
+      sex: getVal(11),
+      section: getVal(12),
+      mapping_status: getVal(13),
+      caste: getVal(14),
+      mobile_no: getVal(15)
+    };
+
+    try {
+      const res = await fetch("/api/update_row", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const out = await res.json();
+      if (!out.ok) throw new Error(out.error || "Update failed");
+        showToast(`Record #${id} updated successfully!`); // Add this
+      for (let i = 5; i <= 15; i++) {
+        const td = $tr.find("td").eq(i);
+        const input = td.find("input");
+        if (input.length) td.text(input.val().trim());
+      }
+
+      $tr.removeClass("editing bg-yellow-500/10");
+      $(btn).addClass("hidden");
+      $(btn).siblings("button").removeClass("hidden");
+
+    } catch (e) {
+      alert("Save failed: " + e.message);
+    }
+  };
+
+  // Modal functions
+  function openModal(title) {
+    document.getElementById("modalTitle").innerText = title || "Filtered Records";
+    document.getElementById("dataModal").classList.remove("hidden");
+  }
+
+  function closeModal() {
+    document.getElementById("dataModal").classList.add("hidden");
+  }
+  window.closeModal = closeModal;
+
+  async function loadModalTable() {
+    const params = new URLSearchParams({
+      ...modalFilters,
+      page: modalPage,
+      page_size: modalPageSize,
+      sort_column: modalSort.column,
+      sort_direction: modalSort.direction
+    });
+
+    const response = await fetchJSON(`/api/table?${params}`);
+    renderModalTable(response.data);
+    updateModalPagination(response);
+  }
+
+  function renderModalTable(data) {
+    const tbody = document.getElementById("modalTableBody");
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="16" class="text-center py-8 text-white/60">No records found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(row => {
+      const displaySex = row.sex === 'Third' || row.sex === 'तृतीय लिंग' ? 'Other' : row.sex;
+      return `
+      <tr class="border-b border-white/5 hover:bg-white/5">
+        <td class="px-3 py-2">${row.id}</td>
+        <td class="px-3 py-2">${row.ac_no || ''}</td>
+        <td class="px-3 py-2">${row.part_no || ''}</td>
+        <td class="px-3 py-2">${row.sl_no_in_part || ''}</td>
+        <td class="px-3 py-2">${row.voter_i_card_no || ''}</td>
+        <td class="px-3 py-2">${row.e_name || ''}</td>
+        <td class="px-3 py-2">${row.rel_name || ''}</td>
+        <td class="px-3 py-2">${row.e_name_eng || ''}</td>
+        <td class="px-3 py-2">${row.rel_name_eng || ''}</td>
+        <td class="px-3 py-2">${row.house_no || ''}</td>
+        <td class="px-3 py-2">${row.age || ''}</td>
+        <td class="px-3 py-2">${displaySex || ''}</td>
+        <td class="px-3 py-2">${row.section || ''}</td>
+        <td class="px-3 py-2">${row.mapping_status || ''}</td>
+        <td class="px-3 py-2">${row.caste || ''}</td>
+        <td class="px-3 py-2">${row.mobile_no || ''}</td>
+      </tr>
+    `;
+    }).join('');
+  }
+
+  function updateModalPagination(response) {
+    // Proper handling of "all" page size
+    let numericPageSize;
+    if (response.page_size === 'all' || response.page_size > 999999) {
+      numericPageSize = response.filtered;
+    } else {
+      numericPageSize = parseInt(response.page_size) || 10;
+    }
+
+    const start = response.data.length > 0 ? ((response.page - 1) * numericPageSize + 1) : 0;
+    const end = response.data.length > 0 ? Math.min(response.page * numericPageSize, response.filtered) : 0;
+
+    document.getElementById("modalShowingStart").innerText = start.toLocaleString();
+    document.getElementById("modalShowingEnd").innerText = end.toLocaleString();
+    document.getElementById("modalTotalRecords").innerText = response.filtered.toLocaleString();
+
+    const totalPages = response.total_pages;
+    const buttonsDiv = document.getElementById("modalPaginationButtons");
+
+    if (totalPages <= 1) {
+      buttonsDiv.innerHTML = '';
+      return;
+    }
+
+    let buttons = '<button onclick="goToModalPage(1)" class="glass rounded-xl px-3 py-1 text-sm hover:scale-105" ' + (modalPage === 1 ? 'disabled' : '') + '>First</button>';
+    buttons += '<button onclick="goToModalPage(' + (modalPage - 1) + ')" class="glass rounded-xl px-3 py-1 text-sm hover:scale-105" ' + (modalPage === 1 ? 'disabled' : '') + '>Prev</button>';
+
+    const startPage = Math.max(1, modalPage - 2);
+    const endPage = Math.min(totalPages, modalPage + 2);
+
+    for (let i = startPage; i <= endPage; i++) {
+      buttons += '<button onclick="goToModalPage(' + i + ')" class="glass rounded-xl px-3 py-1 text-sm hover:scale-105 ' + (i === modalPage ? 'bg-white/20' : '') + '">' + i + '</button>';
+    }
+
+    buttons += '<button onclick="goToModalPage(' + (modalPage + 1) + ')" class="glass rounded-xl px-3 py-1 text-sm hover:scale-105" ' + (modalPage === totalPages ? 'disabled' : '') + '>Next</button>';
+    buttons += '<button onclick="goToModalPage(' + totalPages + ')" class="glass rounded-xl px-3 py-1 text-sm hover:scale-105" ' + (modalPage === totalPages ? 'disabled' : '') + '>Last</button>';
+
+    buttonsDiv.innerHTML = buttons;
+  }
+
+  function goToModalPage(page) {
+    modalPage = page;
+    loadModalTable();
+  }
+
+  function changeModalPageSize() {
+    const select = document.getElementById("modalPageSize");
+    modalPageSize = select.value;
+    modalPage = 1;
+    loadModalTable();
+  }
+
+  function sortModalTable(column) {
+    if (modalSort.column === column) {
+      modalSort.direction = modalSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+      modalSort.column = column;
+      modalSort.direction = 'asc';
+    }
+    loadModalTable();
+  }
+
+  function searchModalTable() {
+    const search = document.getElementById("modalSearch").value;
+    modalFilters.search = search;
+    modalPage = 1;
+    loadModalTable();
+  }
+
+  function loadModalWithFilters(title, filters) {
+    modalFilters = filters || {};
+    modalPage = 1;
+    modalPageSize = 10;
+    modalSort = { column: 'id', direction: 'desc' };
+    document.getElementById("modalSearch").value = "";
+    document.getElementById("modalPageSize").value = "10";
+    openModal(title);
+    loadModalTable();
+  }
+
+  // Chart click events
+  function attachChartClicks() {
+    if (ageGenderChart) {
+      ageGenderChart.updateOptions({
+        chart: {
+          events: {
+            dataPointSelection: function(event, chartContext, config) {
+              const ageBucket = chartContext.w.globals.labels[config.dataPointIndex];
+              const seriesName = chartContext.w.globals.seriesNames[config.seriesIndex];
+              let gender = "all";
+              if (seriesName === "Male") gender = "Male";
+              else if (seriesName === "Female") gender = "Female";
+              else gender = "Unknown";
+              loadModalWithFilters(`Age ${ageBucket} • ${seriesName}`, {
+                mapping: getMapping(),
+                gender,
+                age_bucket: ageBucket
+              });
+            }
+          }
+        }
+      }, false, true);
+    }
+  }
+
+  // Export functions
+  async function exportTableData(format) {
+    const mapping = getMapping();
+    const filters = getFilters();
+    const params = new URLSearchParams({
+      mapping,
+      ...filters,
+      sort_column: currentSort.column,
+      sort_direction: currentSort.direction
+    });
+
+    showExportNotification('Preparing export...');
+    const response = await fetchJSON(`/api/export_data?${params}`);
+
+    if (format === 'excel') {
+      exportToExcel(response.data, 'voter_data', 'VoterData');
+    } else {
+      exportToPDF(response.data, 'Voter Data Report', 'voter_data');
+    }
+  }
+
+  async function exportModalData(format) {
+    const params = new URLSearchParams({
+      ...modalFilters,
+      sort_column: modalSort.column,
+      sort_direction: modalSort.direction
+    });
+
+    showExportNotification('Preparing export...');
+    const response = await fetchJSON(`/api/export_data?${params}`);
+
+    if (format === 'excel') {
+      exportToExcel(response.data, 'filtered_records', 'Filtered');
+    } else {
+      exportToPDF(response.data, 'Filtered Records Report', 'filtered_records');
+    }
+  }
+
+  function exportToExcel(data, filename, sheetName) {
+    if (data.length === 0) {
+      alert('No data to export!');
+      return;
+    }
+
+    sheetName = sheetName.replace(/[:\\/\?\*\[\]]/g, '-');
+
+    const headers = [
+      ['Id', 'Ac_No', 'Part No', 'SL No', 'Voter Id Card No',
+       'Hindi Voter Name', 'Hindi Relative Name',
+       'English Voter Name', 'English Relative Name',
+       'House No', 'Age', 'Gender', 'Booth No', 'Mapping Status', 'Caste', 'Mobile No']
+    ];
+
+    const rows = data.map(row => [
+      row.id, row.ac_no, row.part_no, row.sl_no_in_part, row.voter_i_card_no,
+      row.e_name, row.rel_name, row.e_name_eng, row.rel_name_eng,
+      row.house_no, row.age, row.sex === 'Third' || row.sex === 'तृतीय लिंग' ? 'Other' : row.sex, row.section, row.mapping_status, row.caste, row.mobile_no
+    ]);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([...headers, ...rows]);
+
+    const colWidths = headers[0].map((h, i) => {
+      const maxLen = Math.max(
+        h.length,
+        ...rows.map(r => (r[i] || '').toString().length)
+      );
+      return { wch: Math.min(maxLen + 2, 50) };
+    });
+    ws['!cols'] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const fullFilename = `${filename}_${timestamp}.xlsx`;
+
+    XLSX.writeFile(wb, fullFilename);
+    showExportNotification(`Downloaded ${fullFilename}`);
+  }
+
+  function exportToPDF(data, title, filename) {
+    if (data.length === 0) {
+      alert('No data to export!');
+      return;
+    }
+
+    const printContainer = document.createElement('div');
+    printContainer.id = 'pdf-print-temp';
+    printContainer.style.position = 'fixed';
+    printContainer.style.visibility = 'hidden';
+    printContainer.style.zIndex = '-1';
+
+    const headerElement = document.createElement('h2');
+    headerElement.style.textAlign = 'center';
+    headerElement.style.marginBottom = '20px';
+    headerElement.style.fontSize = '18px';
+    headerElement.style.fontWeight = 'bold';
+    headerElement.textContent = title;
+    printContainer.appendChild(headerElement);
+
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '10px';
+
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+      <tr style="background: #f0f0f0;">
+        <th style="border: 1px solid #ddd; padding: 8px;">Id</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Ac</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Part</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">SL</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Voter Id</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Hindi Name</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Hindi Rel</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Eng Name</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Eng Rel</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">House</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Age</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Gender</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Booth No</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Mapping</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Caste</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Mobile</th>
+      </tr>
+    `;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    tbody.innerHTML = data.map(row => `
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.id}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.ac_no || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.part_no || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.sl_no_in_part || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.voter_i_card_no || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.e_name || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.rel_name || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.e_name_eng || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.rel_name_eng || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.house_no || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.age || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.sex === 'Third' || row.sex === 'तृतीय लिंग' ? 'Other' : row.sex || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.section || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.mapping_status || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.caste || ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${row.mobile_no || ''}</td>
+      </tr>
+    `).join('');
+    table.appendChild(tbody);
+
+    printContainer.appendChild(table);
+    document.body.appendChild(printContainer);
+
+    const printStyle = document.createElement('style');
+    printStyle.textContent = `
+      @media print {
+        body * { visibility: hidden; }
+        #pdf-print-temp, #pdf-print-temp * { visibility: visible !important; }
+        #pdf-print-temp {
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100%;
+          margin: 0;
+          padding: 20px;
+          background: white;
+          color: black !important;
+        }
+      }
+    `;
+    document.head.appendChild(printStyle);
+
+    const originalTitle = document.title;
+    document.title = title;
+
+    window.print();
+
+    setTimeout(() => {
+      printStyle.remove();
+      printContainer.remove();
+      document.title = originalTitle;
+    }, 2000);
+  }
+
+  function showExportNotification(message) {
+    const notification = document.createElement('div');
+    notification.innerHTML = `
+      <div style="position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10000; font-family: Inter, sans-serif; animation: slideInRight 0.3s ease-out;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          <div>
+            <div style="font-weight: 600;">${message}</div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
+  }
+
+      // Show/Hide Loader
+  function toggleLoader(show = true) {
+      const loader = document.getElementById('globalLoader');
+      if (show) {
+        loader.classList.remove('hidden');
+        loader.classList.add('flex');
+      } else {
+        loader.classList.add('hidden');
+        loader.classList.remove('flex');
+      }
+    }
+
+    // Global Toast System
+  function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const bgColor = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
+
+      toast.className = `${bgColor} text-white px-6 py-3 rounded-xl shadow-lg transform transition-all duration-300 translate-y-10 opacity-0 flex items-center gap-3`;
+      toast.innerHTML = `
+        <span class="text-lg">${type === 'success' ? '✓' : '✕'}</span>
+        <span class="font-medium">${message}</span>
+      `;
+
+      container.appendChild(toast);
+
+      // Animate in
+      setTimeout(() => {
+        toast.classList.remove('translate-y-10', 'opacity-0');
+      }, 10);
+
+      // Auto remove
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+</script>
+
+<style>
+  .sort-icon {
+    opacity: 0.5;
+    font-size: 10px;
+    margin-left: 4px;
+  }
+
+  th:hover .sort-icon {
+    opacity: 1;
+  }
+
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Logo Animation */
+  .logo-container {
+    position: relative;
+    width: 80px;
+    height: 80px;
+  }
+
+  .logo-svg {
+    animation: logoFloat 3s ease-in-out infinite, logoRotate 8s linear infinite;
+  }
+
+  @keyframes logoFloat {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes logoRotate {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  .logo-container::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+    transform: translate(0%, 25%) scale(1);
+    opacity: 0.6;
+    }
+
+    50% {
+        transform: translate(0%, -25%) scale(1.2);
+        opacity: 0.3;
+    }
+  }
+</style>
+
+{% endblock %}
