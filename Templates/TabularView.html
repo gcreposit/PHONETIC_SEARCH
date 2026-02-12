@@ -7,6 +7,10 @@
 
     <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/11.10.6/sweetalert2.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/11.10.6/sweetalert2.all.min.js"></script>
+
 
     <style>
         .fade-in {
@@ -91,6 +95,7 @@
             Nagar Nigam
         </button>
 
+
         <button data-endpoint="gram-panchayat-voters"
                 class="tab-btn px-6 py-2 rounded-full font-semibold shadow-md transition bg-white">
             Gram Panchayat
@@ -98,59 +103,56 @@
 
         <button data-endpoint="voters-pdf-extract"
                 class="tab-btn px-6 py-2 rounded-full font-semibold shadow-md transition bg-white">
-            Voters PDF
+            Banthara
         </button>
 
         <button data-endpoint="voters-data"
-                class="tab-btn px-6 py-2 rounded-full font-semibold shadow-md transition bg-white hidden">
+                class="tab-btn px-6 py-2 rounded-full font-semibold shadow-md transition bg-white">
             Voters Data
         </button>
+
+
+        <button data-endpoint="testing-data"
+                class="tab-btn px-6 py-2 rounded-full font-semibold shadow-md transition bg-white">
+            Testing Data
+        </button>
+
     </div>
 
 
     <!-- Card -->
     <div class="bg-white rounded-2xl shadow-xl p-6">
-
-        <!-- Search -->
-        <!--        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">-->
-
-        <!--            <div class="flex items-center bg-gray-100 rounded-full px-4 py-2 w-full md:w-1/2 shadow-inner">-->
-        <!--                <input type="text"-->
-        <!--                       id="searchInput"-->
-        <!--                       placeholder="Enter name or voter ID..."-->
-        <!--                       onkeypress="handleSearch(event)"-->
-        <!--                       class="bg-transparent outline-none w-full px-2 py-1"/>-->
-        <!--                <button onclick="triggerSearch()"-->
-        <!--                        class="bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition">-->
-        <!--                    Search-->
-        <!--                </button>-->
-        <!--            </div>-->
-        <!--<div class="flex justify-end mb-4">-->
-        <!--    <button onclick="smartExportExcel()"-->
-        <!--            class="bg-green-600 text-white px-5 py-2 rounded-full hover:bg-green-700 transition">-->
-        <!--        Export Excel-->
-        <!--    </button>-->
-        <!--</div>-->
-
-        <!--            <div>-->
-        <!--                <span class="px-4 py-2 bg-gray-100 rounded-full shadow">-->
-        <!--                    Total Records: <span id="totalCount" class="font-bold">0</span>-->
-        <!--                </span>-->
-        <!--            </div>-->
-        <!--        </div>-->
         <!-- Search + Export + Total -->
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
 
-            <!-- 🔍 Search -->
-            <div class="flex items-center bg-gray-100 rounded-full px-4 py-2 w-full md:w-1/2 shadow-inner">
+
+            <div class="flex items-center bg-gray-100 rounded-full px-4 py-2 w-full md:w-1/2 shadow-inner gap-2">
+
+                <!-- 🔍 Search Input -->
                 <input type="text"
                        id="searchInput"
                        placeholder="Enter name or voter ID..."
                        onkeypress="handleSearch(event)"
                        class="bg-transparent outline-none w-full px-2 py-1"/>
+
+                <!-- 🔽 Search Type Dropdown -->
+                <select id="searchType" onchange="updateSearchInstruction()"
+                        class="bg-white border rounded-full px-3 py-1 text-sm shadow-sm focus:outline-none">
+                    <option value="normal">Single</option>
+                    <option value="multiple">Multiple (Comma)</option>
+                    <option value="voter_father">Voter → Father</option>
+                </select>
+
+                <!-- 🔎 Search Button -->
                 <button onclick="triggerSearch()"
                         class="bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition">
                     Search
+                </button>
+
+
+                <button onclick="resetSearch()"
+                        class="bg-gray-500 text-white px-5 py-2 rounded-full hover:bg-gray-600 transition">
+                    Reset
                 </button>
             </div>
 
@@ -171,6 +173,12 @@
             </div>
 
         </div>
+        <!-- 🔔 Search Instructions -->
+        <div id="searchInstruction"
+             class="text-sm text-gray-600 m-2 px-2">
+            🔹 Enter a single name. Example: रमेश
+        </div>
+
 
         <!-- Table -->
         <div class="overflow-auto max-h-[60vh] border rounded-lg fade-in">
@@ -200,7 +208,7 @@
         </div>
 
         <!-- Pagination -->
-        <div class="flex justify-between items-center mt-6">
+        <div id="paginationBox" class="flex justify-between items-center mt-6">
             <select id="limitSelect" onchange="changeLimit()"
                     class="border px-3 py-1 rounded-md shadow-sm">
                 <option value="100" selected>100 per page</option>
@@ -229,7 +237,32 @@
 </div>
 
 <script>
+    function updateSearchInstruction() {
+        const type = document.getElementById("searchType").value;
+        const instructionBox = document.getElementById("searchInstruction");
+
+        if (type === "normal") {
+            instructionBox.innerHTML =
+                "🔹 Single Search: Enter one name. <br> Example: <b>रमेश</b>";
+        } else if (type === "multiple") {
+            instructionBox.innerHTML =
+                "🔹 Multiple Search: Enter names separated by comma. <br> Example: <b>रमेश,लक्ष्मी,कृष्ण</b>";
+        } else if (type === "voter_father") {
+            instructionBox.innerHTML =
+                "🔹 Voter → Father Search: Enter voter name and father name separated by one comma. <br> Example: <b>रमेश,कृष्ण</b>";
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        updateSearchInstruction();
+    });
+
+
+</script>
+
+<script>
     let currentEndpoint = 'nagar-nigam';
+    // let currentEndpoint = 'testing-data';
     let currentPage = 1;
     let currentLimit = 100;
     let isSearching = false;
@@ -237,6 +270,12 @@
     function showLoader(show) {
         document.getElementById('pageLoader').style.display = show ? 'flex' : 'none';
     }
+
+    function togglePagination(show) {
+        const box = document.getElementById("paginationBox");
+        box.style.display = show ? "flex" : "none";
+    }
+
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', function () {
@@ -260,6 +299,38 @@
         });
     });
 
+    function resetSearch() {
+
+        // 🔥 Clear input
+        document.getElementById("searchInput").value = "";
+
+        // 🔥 Reset search type
+        document.getElementById("searchType").value = "normal";
+
+        // 🔥 Reset state
+        isSearching = false;
+
+        // 🔥 Update instructions
+        updateSearchInstruction();
+
+        // 🔥 Show pagination again
+        togglePagination(true);
+
+        // 🔥 Reset page
+        currentPage = 1;
+
+        // 🔥 Reload current tab data
+        fetchData();
+
+        Swal.fire({
+            icon: "success",
+            title: "Reset Complete",
+            text: "Search cleared and data reloaded",
+            timer: 1500,
+            showConfirmButton: false
+        });
+    }
+
 
     function changePage(step) {
         if (isSearching) return;
@@ -279,30 +350,96 @@
         if (e.key === 'Enter') triggerSearch();
     }
 
-    function triggerSearch() {
-        const query = document.getElementById('searchInput').value.trim();
 
+    function triggerSearch() {
+        // const query = document.getElementById('searchInput').value.trim();
+        const searchType = document.getElementById('searchType').value;
+        let rawQuery = document.getElementById('searchInput').value;
+
+// 🔥 Remove extra spaces
+        rawQuery = rawQuery.replace(/\s+/g, ' ').trim();
+
+// 🔥 Clean comma formatting (remove space around commas)
+        rawQuery = rawQuery.replace(/\s*,\s*/g, ',');
+
+// 🔥 Remove duplicate commas
+        rawQuery = rawQuery.replace(/,+/g, ',');
+
+// 🔥 Remove leading or trailing commas
+        rawQuery = rawQuery.replace(/^,|,$/g, '');
+
+        const query = rawQuery;
+
+        console.log("query ", query)
         if (!query) {
             isSearching = false;
             fetchData();
             return;
         }
-
         isSearching = true;
+        togglePagination(false);
 
-        let searchUrl = "";
+        // ✅ Validate voter_father format
+        if (searchType === "voter_father") {
+
+            const parts = query.split(",").map(p => p.trim()).filter(p => p);
+
+            if (parts.length !== 2) {
+                Swal.fire({
+                    icon: "warning",
+                    title: "Invalid Format",
+                    text: "Please enter exactly two names separated by one comma. Example: ra,vi",
+                });
+                return;
+            }
+
+            // Also block multiple commas like ra,vi,ne
+            const commaCount = (query.match(/,/g) || []).length;
+            if (commaCount !== 1) {
+                Swal.fire({
+                    icon: "warning",
+                    title: "Invalid Format",
+                    text: "Only one comma is allowed. Example: हीरा,सुखी",
+                });
+                return;
+            }
+        }
+
+
+        let baseUrl = "";
+
         if (currentEndpoint === "nagar-nigam")
-            searchUrl = `/api/pysearch/nagar-nigam?q=${encodeURIComponent(query)}`;
+            baseUrl = `/api/pysearch/nagar-nigam`;
         else if (currentEndpoint === "gram-panchayat-voters")
-            searchUrl = `/api/pysearch/gram-panchayat?q=${encodeURIComponent(query)}`;
+            baseUrl = `/api/pysearch/gram-panchayat`;
         else if (currentEndpoint === "voters-data")
-            searchUrl = `/api/pysearch/voters-data?q=${encodeURIComponent(query)}`;
-        else
-            searchUrl = `/api/pysearch/voter-pdf?q=${encodeURIComponent(query)}`;
+            baseUrl = `/api/pysearch/voters-data`;
+        else if (currentEndpoint === "voter-pdf")
+            baseUrl = `/api/pysearch/voter-pdf`;
+        else if (currentEndpoint === "testing-data")
+            baseUrl = `/api/pysearch/testing-data`;
+        else {
+            baseUrl = "";
+            alert("No Search Found Contact to Developer");
+            return;
+        }
 
-        console.log("searchUrl ", searchUrl)
+
+        const searchUrl = `${baseUrl}?q=${encodeURIComponent(query)}&type=${searchType}`;
+
+        // console.log("query: ", query);
+        // console.log("Search URL:", searchUrl);
+
         executeFetch(searchUrl);
     }
+
+    document.getElementById("searchInput").addEventListener("input", function () {
+        const val = this.value;
+        if (val.includes(",")) {
+            document.getElementById("searchType").value = "multiple";
+        }
+    });
+
 
     function fetchData() {
         const url = `/api/${currentEndpoint}?page=${currentPage}&limit=${currentLimit}`;
@@ -311,17 +448,54 @@
 
     let currentTableData = []; // stores last fetched data
 
+    // function executeFetch(url) {
+    //     showLoader(true);
+    //     fetch(url)
+    //         .then(res => res.json())
+    //         .then(res => {
+    //             currentTableData = res.data || []; // ✅ store full dataset
+    //
+    //             renderTable(currentTableData);
+    //             document.getElementById('totalCount').innerText =
+    //                 res.total_records || res.total || res.total_matches || res.data.length;
+    //             document.getElementById('currentPage').innerText = currentPage;
+    //             showLoader(false);
+    //         })
+    //         .catch(err => {
+    //             console.error(err);
+    //             showLoader(false);
+    //             alert("Error loading data.");
+    //         });
+    // }
+
+
+    let renderVersion = 0;
+
     function executeFetch(url) {
+
         showLoader(true);
+        renderVersion++;
+
+
+        // 🔥 Detect if this is search API
+        const isSearchRequest = url.includes("/api/pysearch/");
+
+        // 🔥 Toggle pagination based on request type
+        togglePagination(!isSearchRequest);
+
         fetch(url)
             .then(res => res.json())
             .then(res => {
-                currentTableData = res.data || []; // ✅ store full dataset
 
-                renderTable(currentTableData);
+                currentTableData = res.data || [];
+
+                renderTable(currentTableData, renderVersion);
+
                 document.getElementById('totalCount').innerText =
-                    res.total_records || res.total || res.total_matches || res.data.length;
+                    res.total_records || res.total || res.total_matches || currentTableData.length;
+
                 document.getElementById('currentPage').innerText = currentPage;
+
                 showLoader(false);
             })
             .catch(err => {
@@ -331,7 +505,9 @@
             });
     }
 
-    function renderTable(data) {
+
+    async function renderTable(data, version) {
+
         const body = document.getElementById('tableBody');
         const head = document.getElementById('tableHead');
 
@@ -343,7 +519,6 @@
             return;
         }
 
-        let rowsHTML = "";
 
         // 🔥 VOTERS DATA TAB
         if (currentEndpoint === "voters-data") {
@@ -356,73 +531,215 @@
                 <th class="px-3 py-2">NAME (ENGLISH)</th>
                 <th class="px-3 py-2">CASTE</th>
                 <th class="px-3 py-2">AGE</th>
-                        <th class="px-3 py-2">Mobile Number</th>
+                <th class="px-3 py-2">Mobile Number</th>
                 <th class="px-3 py-2">RELATION NAME (HINDI)</th>
                 <th class="px-3 py-2">RELATION NAME (ENG)</th>
-
                 <th class="px-3 py-2">SECTION</th>
             </tr>
         `;
-
-            for (let i = 0; i < data.length; i++) {
-                const row = data[i];
-
-                rowsHTML += `
-                <tr class="hover:bg-blue-50 transition fade-in">
-                    <td class="px-3 py-2">${i + 1}</td>
-                     <td class="px-3 py-2">${row.voter_i_card_no || '-'}</td>
-                    <td class="px-3 py-2">${row.e_name || '-'}</td>
-                    <td class="px-3 py-2">${row.e_name_eng || '-'}</td>
-                    <td class="px-3 py-2">${row.caste || '-'}</td>
-                    <td class="px-3 py-2">${row.age || '-'}</td>
-                         <td class="px-3 py-2">${row.mobile_number || '-'}</td>
-                    <td class="px-3 py-2">${row.rel_name || '-'}</td>
-                    <td class="px-3 py-2">${row.rel_name_eng || '-'}</td>
-
-                    <td class="px-3 py-2">${row.section || '-'}</td>
-                </tr>
-            `;
+        } else {
+            head.innerHTML = `
+            <tr>
+                <th class="px-3 py-2">SR. NO</th>
+                <th class="px-3 py-2">VOTER NAME</th>
+                <th class="px-3 py-2">FATHER / HUSBAND / MOTHER</th>
+                <th class="px-3 py-2">GENDER</th>
+                <th class="px-3 py-2">AGE</th>
+                <th class="px-3 py-2">LOCALITY</th>
+                <th class="px-3 py-2">CENTER NUM</th>
+                <th class="px-3 py-2">CENTER NAME</th>
+                 ${
+                currentEndpoint === "testing-data"
+                    ? `<th class="px-3 py-2">ACTION</th>`
+                    : ``
             }
-
-            body.innerHTML = rowsHTML;  // ✅ Inject once
-            return;
-        }
-
-        // 🔥 DEFAULT TABLE
-        head.innerHTML = `
-        <tr>
-            <th class="px-3 py-2">SR. NO</th>
-            <th class="px-3 py-2">VOTER NAME</th>
-            <th class="px-3 py-2">FATHER / HUSBAND / MOTHER</th>
-            <th class="px-3 py-2">GENDER</th>
-            <th class="px-3 py-2">AGE</th>
-
-            <th class="px-3 py-2">LOCALITY</th>
-            <th class="px-3 py-2">CENTER NUM</th>
-            <th class="px-3 py-2">CENTER NAME</th>
-
-        </tr>
-    `;
-
-        for (let i = 0; i < data.length; i++) {
-            const row = data[i];
-
-            rowsHTML += `
-            <tr class="hover:bg-blue-50 transition fade-in">
-                <td class="px-3 py-2">${i + 1}</td>
-                <td class="px-3 py-2">${row.voter_name || '-'}</td>
-                <td class="px-3 py-2">${row.father_husband_mother_name || '-'}</td>
-                <td class="px-3 py-2">${row.gender || '-'}</td>
-                <td class="px-3 py-2">${row.age || '-'}</td>
-
-                <td class="px-3 py-2">${row.locality_name || row.polling_location_name || '-'}</td>
-                <td class="px-3 py-2">${row.polling_center_num || '-'}</td>
-                <td class="px-3 py-2">${row.polling_center_name || '-'}</td>
             </tr>
         `;
         }
 
-        body.innerHTML = rowsHTML;  // ✅ Inject once
+        const chunkSize = 200; // 🔥 tune this (100–500 ideal)
+
+        for (let i = 0; i < data.length; i += chunkSize) {
+            // 🔥 STOP if new render started
+            if (version !== renderVersion) {
+                console.log("Old render stopped");
+                return;
+            }
+
+            const chunk = data.slice(i, i + chunkSize);
+            let rowsHTML = "";
+
+            for (let j = 0; j < chunk.length; j++) {
+
+                const row = chunk[j];
+                const index = i + j + 1;
+
+                if (currentEndpoint === "voters-data") {
+
+                    rowsHTML += `
+                    <tr class="hover:bg-blue-50 transition fade-in">
+                        <td class="px-3 py-2">${index}</td>
+                        <td class="px-3 py-2">${row.voter_i_card_no || '-'}</td>
+                        <td class="px-3 py-2">${row.e_name || '-'}</td>
+                        <td class="px-3 py-2">${row.e_name_eng || '-'}</td>
+                        <td class="px-3 py-2">${row.caste || '-'}</td>
+                        <td class="px-3 py-2">${row.age || '-'}</td>
+                        <td class="px-3 py-2">${row.mobile_number || '-'}</td>
+                        <td class="px-3 py-2">${row.rel_name || '-'}</td>
+                        <td class="px-3 py-2">${row.rel_name_eng || '-'}</td>
+                        <td class="px-3 py-2">${row.section || '-'}</td>
+                    </tr>
+                `;
+
+                } else {
+
+                    //     rowsHTML += `
+                    //     <tr class="hover:bg-blue-50 transition fade-in">
+                    //         <td class="px-3 py-2">${index}</td>
+                    //         <td class="px-3 py-2">${row.voter_name || '-'}</td>
+                    //         <td class="px-3 py-2">${row.father_husband_mother_name || '-'}</td>
+                    //         <td class="px-3 py-2">
+                    //             ${
+                    //         row.gender === 'पु'
+                    //             ? 'पुरुष'
+                    //             : row.gender === 'म'
+                    //                 ? 'महिला'
+                    //                 : (row.gender || '-')
+                    //     }
+                    //         </td>
+                    //         <td class="px-3 py-2">${row.age || '-'}</td>
+                    //         <td class="px-3 py-2">${row.locality_name || row.polling_location_name || '-'}</td>
+                    //         <td class="px-3 py-2">${row.polling_center_num || '-'}</td>
+                    //         <td class="px-3 py-2">${row.polling_center_name || '-'}</td>
+                    //     </tr>
+                    // `;
+                    rowsHTML += `
+<tr class="hover:bg-blue-50 transition fade-in">
+    <td class="px-3 py-2">${index}</td>
+    <td class="px-3 py-2">${row.voter_name || '-'}</td>
+    <td class="px-3 py-2">${row.father_husband_mother_name || '-'}</td>
+    <td class="px-3 py-2">
+        ${
+                        row.gender === 'पु'
+                            ? 'पुरुष'
+                            : row.gender === 'म'
+                                ? 'महिला'
+                                : (row.gender || '-')
+                    }
+    </td>
+    <td class="px-3 py-2">${row.age || '-'}</td>
+    <td class="px-3 py-2">${row.locality_name || row.polling_location_name || '-'}</td>
+    <td class="px-3 py-2">${row.polling_center_num || '-'}</td>
+    <td class="px-3 py-2">${row.polling_center_name || '-'}</td>
+
+    ${
+                        currentEndpoint === "testing-data"
+                            ? `
+        <td class="px-3 py-2 space-x-2">
+
+            <button
+                onclick="useForSearch('${row.voter_name}', '${row.father_husband_mother_name}')"
+                class="bg-indigo-600 text-white px-3 py-1 rounded-md text-xs hover:bg-indigo-700">
+                Use
+            </button>
+
+            <button
+    onclick="toggleStatus(${row.id}, this)"
+    class="${
+                                row.status === 'ACTIVE'
+                                    ? 'bg-green-600 hover:bg-green-700'
+                                    : 'bg-red-600 hover:bg-red-700'
+                            } text-white px-3 py-1 rounded-md text-xs">
+    ${row.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+</button>
+
+
+          <button
+    onclick="togglecheckedStatus(${row.id}, this)"
+    class="${row.check_status === 'CHECKED'
+                                ? 'bg-green-600 hover:bg-green-700'
+                                : 'bg-red-600 hover:bg-red-700'
+                            } text-white px-3 py-1 rounded-md text-xs">
+    ${row.check_status === 'CHECKED' ? 'Checked' : 'Unchecked'}
+</button>
+
+
+        </td>
+        `
+                            : ``
+                    }
+</tr>
+`;
+
+                }
+            }
+
+            body.insertAdjacentHTML("beforeend", rowsHTML);
+
+            // 🔥 Let browser breathe
+            await new Promise(requestAnimationFrame);
+        }
+    }
+
+    function useForSearch(voter, father) {
+
+        const searchInput = document.getElementById("searchInput");
+        const searchType = document.getElementById("searchType");
+
+        // Set search value
+        searchInput.value = `${voter},${father}`;
+
+        // Set type to voter_father
+        searchType.value = "voter_father";
+
+        updateSearchInstruction();
+        triggerSearch();
+
+        searchInput.focus();
+    }
+
+
+    // function toggleStatus(id, button) {
+    //
+    //     console.log("Clicked ID:", id);
+    //
+    //     if (button.innerText === "Active") {
+    //         button.innerText = "Inactive";
+    //         button.classList.remove("bg-green-600");
+    //         button.classList.add("bg-red-600");
+    //     } else {
+    //         button.innerText = "Active";
+    //         button.classList.remove("bg-red-600");
+    //         button.classList.add("bg-green-600");
+    //     }
+    // }
+
+    function toggleStatus(id) {
+        fetch(`/api/testing-data/toggle-status/${id}`, {
+            method: "POST"
+        })
+            .then(res => res.json())
+            .then(data => {
+                console.log("Toggled:", data);
+                alert("Done ✅ Status Updated");
+                // reload current table
+                fetchData();
+            })
+            .catch(err => console.error(err));
+    }
+
+    function togglecheckedStatus(id) {
+        fetch(`/api/testing-data/check-toggle/${id}`, {
+            method: "POST"
+        })
+            .then(res => res.json())
+            .then(data => {
+                console.log("Toggled:", data);
+                alert("Done ✅ Status Updated");
+                // reload current table
+                fetchData();
+            })
+            .catch(err => console.error(err));
     }
 
 
@@ -456,60 +773,117 @@
         tabs[0].click();
     });
 
-    function smartExportExcel() {
+    async function smartExportExcel() {
 
-        if (!currentTableData || currentTableData.length === 0) {
-            alert("No data to export.");
+        if (!currentEndpoint) {
+            Swal.fire("Error", "No endpoint selected.", "error");
             return;
         }
 
         showLoader(true);
+        document.getElementById("loaderText").innerText = "Preparing full export...";
 
-        setTimeout(() => {
+        let allData = [];
+        let page = 1;
+        const limit = 10000; // 🔥 large chunk size (adjust if needed)
+        let hasMore = true;
 
-            let exportData = [];
+        try {
 
-            if (currentEndpoint === "voters-data") {
+            while (hasMore) {
 
-                exportData = currentTableData.map((row, index) => ({
-                    "SR NO": index + 1,
-                    "VOTER ID": row.voter_i_card_no || '',
-                    "NAME (HINDI)": row.e_name || '',
-                    "NAME (ENGLISH)": row.e_name_eng || '',
-                    "CASTE": row.caste || '',
-                    "AGE": row.age || '',
-                    "MOBILE": row.mobile_number || '',
-                    "RELATION NAME (HINDI)": row.rel_name || '',
-                    "RELATION NAME (ENG)": row.rel_name_eng || '',
-                    "SECTION": row.section || ''
-                }));
+                document.getElementById("loaderText").innerText =
+                    `Fetching page ${page}...`;
 
-            } else {
+                let baseUrl = `/api/${currentEndpoint}?page=${page}&limit=${limit}`;
 
-                exportData = currentTableData.map((row, index) => ({
-                    "SR NO": index + 1,
-                    "VOTER NAME": row.voter_name || '',
-                    "FATHER/HUSBAND/MOTHER": row.father_husband_mother_name || '',
-                    "GENDER": row.gender || '',
-                    "AGE": row.age || '',
-                    "LOCALITY": row.locality_name || row.polling_location_name || '',
-                    "CENTER NUM": row.polling_center_num || '',
-                    "CENTER NAME": row.polling_center_name || ''
-                }));
+                // 🔥 If searching, export search result instead
+                const query = document.getElementById('searchInput').value.trim();
+                const searchType = document.getElementById('searchType').value;
 
+                if (query) {
+                    baseUrl = `/api/pysearch/${currentEndpoint}?q=${encodeURIComponent(query)}&type=${searchType}&page=${page}&limit=${limit}`;
+                }
+
+                const response = await fetch(baseUrl);
+                const res = await response.json();
+
+                const chunk = res.data || [];
+
+                if (chunk.length > 0) {
+                    allData = allData.concat(chunk);
+                    page++;
+                } else {
+                    hasMore = false;
+                }
+
+                // 🔥 Small delay to prevent UI blocking
+                await new Promise(resolve => setTimeout(resolve, 50));
             }
 
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Voter Report");
+            if (allData.length === 0) {
+                showLoader(false);
+                Swal.fire("No Data", "Nothing to export.", "warning");
+                return;
+            }
 
-            const fileName = `Voter_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            document.getElementById("loaderText").innerText =
+                `Exporting ${allData.length} records...`;
 
-            XLSX.writeFile(wb, fileName);
+            exportFullData(allData);
 
-            showLoader(false);
+        } catch (err) {
+            console.error(err);
+            Swal.fire("Error", "Failed to export data.", "error");
+        }
 
-        }, 100);
+        showLoader(false);
+    }
+
+    function exportFullData(fullData) {
+
+        let exportData = [];
+
+        if (currentEndpoint === "voters-data") {
+
+            exportData = fullData.map((row, index) => ({
+                "SR NO": index + 1,
+                "VOTER ID": row.voter_i_card_no || '',
+                "NAME (HINDI)": row.e_name || '',
+                "NAME (ENGLISH)": row.e_name_eng || '',
+                "CASTE": row.caste || '',
+                "AGE": row.age || '',
+                "MOBILE": row.mobile_number || '',
+                "RELATION NAME (HINDI)": row.rel_name || '',
+                "RELATION NAME (ENG)": row.rel_name_eng || '',
+                "SECTION": row.section || ''
+            }));
+
+        } else {
+
+            exportData = fullData.map((row, index) => ({
+                "SR NO": index + 1,
+                "VOTER NAME": row.voter_name || '',
+                "FATHER/HUSBAND/MOTHER": row.father_husband_mother_name || '',
+                "GENDER": row.gender === 'पु'
+                    ? 'पुरुष'
+                    : row.gender === 'म'
+                        ? 'महिला'
+                        : (row.gender || ''),
+                "AGE": row.age || '',
+                "LOCALITY": row.locality_name || row.polling_location_name || '',
+                "CENTER NUM": row.polling_center_num || '',
+                "CENTER NAME": row.polling_center_name || ''
+            }));
+        }
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Full Report");
+
+        const fileName = `Full_Voter_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+        XLSX.writeFile(wb, fileName);
     }
 
 
