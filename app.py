@@ -10,6 +10,8 @@ from config import create_app, db
 from Controller.PageController import page_bp
 from Controller.ApiController import api_bp
 from Controller.PhoneticPythonController import phonetic_py_bp
+# Add at the top with other imports
+from phonetic_dedup_v2 import phonetic_v2_bp
 
 # Load environment variables
 load_dotenv()
@@ -24,7 +26,10 @@ CORS(app, origins="*", supports_credentials=True)
 app.register_blueprint(page_bp, url_prefix='/')
 app.register_blueprint(api_bp, url_prefix='/api')
 app.register_blueprint(phonetic_py_bp)
+app.register_blueprint(phonetic_v2_bp, url_prefix='/api/pysearch/v2')
 
+from phonetic_dedup_v3 import phonetic_v3_bp
+app.register_blueprint(phonetic_v3_bp, url_prefix='/api/pysearch/v3')
 
 def get_conn():
     return pymysql.connect(

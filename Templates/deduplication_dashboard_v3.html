@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voter Deduplication Dashboard v3.0</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header .version {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-top: 5px;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        .content { padding: 30px; }
+        .section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+        }
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .form-group { margin-bottom: 20px; }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .form-group select,
+        .form-group input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        .form-group select:focus,
+        .form-group input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .checkbox-group label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-success { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; }
+        .btn-warning { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%); color: white; }
+        .btn-info { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .progress-section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 2px solid #667eea;
+            display: none;
+        }
+        .progress-section.show { display: block; }
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .progress-status {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #667eea;
+        }
+        .progress-percentage {
+            font-size: 2em;
+            font-weight: bold;
+            color: #11998e;
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 40px;
+            background: #e0e0e0;
+            border-radius: 20px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #11998e 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        .progress-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .progress-metric {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .progress-metric .label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .progress-metric .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            display: none;
+        }
+        .results.show { display: block; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-card .number { font-size: 2em; font-weight: bold; margin-bottom: 5px; }
+        .stat-card .label { font-size: 0.9em; opacity: 0.9; }
+        .duplicate-list { max-height: 500px; overflow-y: auto; margin-top: 20px; }
+        .duplicate-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .duplicate-item .primary {
+            font-weight: 600;
+            color: #11998e;
+            margin-bottom: 10px;
+        }
+        .duplicate-item .gp-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        .duplicate-item .gender-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        .gender-male { background: #3498db; color: white; }
+        .gender-female { background: #e74c3c; color: white; }
+        .gender-other { background: #9b59b6; color: white; }
+        .gender-unknown { background: #95a5a6; color: white; }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .alert.show { display: block; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .info-box strong { color: #2196F3; }
+        .gp-info {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .gp-info strong { color: #ff9800; }
+        pre {
+            background: #2d3748;
+            color: #68d391;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Voter Deduplication Dashboard</h1>
+            <p>Phonetic Matching System for Hindi/English Names</p>
+            <div class="version">v3.0 - GP-Based Grouping + Sorted Adaptive Window</div>
+        </div>
+
+        <div class="content">
+            <div id="alertBox" class="alert"></div>
+
+            <div class="section">
+                <h2>⚙️ Configuration</h2>
+            
+                <div class="form-group">
+                    <label for="tableSelect">Select Table:</label>
+                    <select id="tableSelect" onchange="loadGramPanchayats()">
+                        <option value="gram_panchayat_voters">Gram Panchayat Voters</option>
+                        <option value="nagar_nigam">Nagar Nigam</option>
+                        <option value="voters_pdf_extract">Voters PDF Extract</option>
+                        <option value="voter_data">Voter Data</option>
+                        <option value="testing">Testing Table</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="gpColumn">Gram Panchayat Column Name:</label>
+                    <select id="gpColumn">
+                        <option value="gram_panchayat">gram_panchayat</option>
+                        <option value="name_of_gram_panchayat">name_of_gram_panchayat</option>
+                        <option value="gp_name">gp_name</option>
+                        <option value="village">village</option>
+                    </select>
+                    <div class="gp-info">
+                        <strong>🌟 NEW FEATURE:</strong> Processing is now done GP-by-GP for much faster and more accurate results!
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="gpFilter">Filter by Specific GP (Optional):</label>
+                    <select id="gpFilter">
+                        <option value="">All Gram Panchayats</option>
+                    </select>
+                    <div class="info-box">
+                        <strong>Tip:</strong> Select a specific GP to test on one village first, or leave as "All" to process entire database.
+                    </div>
+                </div>
+            
+                <div class="form-group">
+                    <label for="voterThreshold">Voter Name Threshold (0-100):</label>
+                    <input type="number" id="voterThreshold" min="0" max="100" value="85" step="5">
+                    <div class="info-box">
+                        <strong>Recommended:</strong> 85-90% for balanced accuracy
+                    </div>
+                </div>
+            
+                <div class="form-group">
+                    <label for="fatherThreshold">Father Name Threshold (0-100):</label>
+                    <input type="number" id="fatherThreshold" min="0" max="100" value="80" step="5">
+                    <div class="info-box">
+                        <strong>Recommended:</strong> 80-85% to catch name variations
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="useGender" checked>
+                        <label for="useGender">🚻 Use Gender Validation (Prevent male/female mismatches)</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="dryRun" checked>
+                        <label for="dryRun">🛡️ Dry Run Mode (Preview only - No database changes)</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🎯 Actions</h2>
+                <div class="btn-group">
+                    <button class="btn btn-info" onclick="loadGramPanchayats()" id="btnLoadGPs">
+                        🔄 Load GPs
+                    </button>
+                    <button class="btn btn-info" onclick="previewDuplicates()" id="btnPreview">
+                        👁️ Preview Duplicates
+                    </button>
+                    <button class="btn btn-primary" onclick="runDeduplication()" id="btnRun">
+                        🚀 Run Deduplication
+                    </button>
+                    <button class="btn btn-success" onclick="getStatistics()" id="btnStats">
+                        📊 View Statistics
+                    </button>
+                    <button class="btn btn-warning" onclick="resetToActive()" id="btnReset">
+                        ♻️ Reset to Active
+                    </button>
+                    <button class="btn btn-danger" onclick="clearResults()" id="btnClear">
+                        🗑️ Clear Results
+                    </button>
+                </div>
+            </div>
+
+            <div id="progressSection" class="progress-section">
+                <div class="progress-header">
+                    <div class="progress-status" id="progressStatus">Initializing...</div>
+                    <div class="progress-percentage" id="progressPercentage">0%</div>
+                </div>
+
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar">
+                        <span id="progressBarText">0%</span>
+                    </div>
+                </div>
+
+                <div class="progress-details">
+                    <div class="progress-metric">
+                        <div class="label">Records Processed</div>
+                        <div class="value" id="recordsProcessed">0</div>
+                    </div>
+                    <div class="progress-metric">
+                        <div class="label">Total Records</div>
+                        <div class="value" id="totalRecords">0</div>
+                    </div>
+                    <div class="progress-metric">
+                        <div class="label">GPs Processed</div>
+                        <div class="value" id="gpsProcessed">0</div>
+                    </div>
+                    <div class="progress-metric">
+                        <div class="label">Current GP</div>
+                        <div class="value" id="currentGP" style="font-size: 1em;">--</div>
+                    </div>
+                    <div class="progress-metric">
+                        <div class="label">Duplicates Found</div>
+                        <div class="value" id="duplicatesFound">0</div>
+                    </div>
+                    <div class="progress-metric">
+                        <div class="label">Time Remaining</div>
+                        <div class="value" id="timeRemaining">--</div>
+                    </div>
+                </div>
+
+                <div id="progressSpinner" class="spinner" style="display:none;"></div>
+            </div>
+
+            <div id="results" class="results">
+                <h3>📋 Results</h3>
+                <div id="statsContainer" class="stats"></div>
+                <div id="duplicateList" class="duplicate-list"></div>
+                <div id="jsonOutput"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/pysearch/v3';
+        let progressInterval = null;
+
+        function showAlert(message, type = 'success') {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.className = `alert alert-${type} show`;
+            alertBox.textContent = message;
+            setTimeout(() => alertBox.classList.remove('show'), 5000);
+        }
+
+        function disableButtons() {
+            ['btnLoadGPs', 'btnPreview', 'btnRun', 'btnStats', 'btnReset', 'btnClear'].forEach(id => {
+                document.getElementById(id).disabled = true;
+            });
+        }
+
+        function enableButtons() {
+            ['btnLoadGPs', 'btnPreview', 'btnRun', 'btnStats', 'btnReset', 'btnClear'].forEach(id => {
+                document.getElementById(id).disabled = false;
+            });
+        }
+
+        function showProgress() {
+            document.getElementById('progressSection').classList.add('show');
+            document.getElementById('progressSpinner').style.display = 'block';
+        }
+
+        function hideProgress() {
+            document.getElementById('progressSection').classList.remove('show');
+            document.getElementById('progressSpinner').style.display = 'none';
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+        }
+
+        function showResults() {
+            document.getElementById('results').classList.add('show');
+        }
+
+        function clearResults() {
+            document.getElementById('results').classList.remove('show');
+            document.getElementById('statsContainer').innerHTML = '';
+            document.getElementById('duplicateList').innerHTML = '';
+            document.getElementById('jsonOutput').innerHTML = '';
+            showAlert('Results cleared', 'success');
+        }
+
+        function formatTime(seconds) {
+            if (!seconds || seconds < 0) return '--';
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+            else if (minutes > 0) return `${minutes}m ${secs}s`;
+            else return `${secs}s`;
+        }
+
+        function updateProgressDisplay(data) {
+            document.getElementById('progressStatus').textContent = data.current_step;
+            document.getElementById('progressPercentage').textContent = data.percentage + '%';
+            document.getElementById('progressBar').style.width = data.percentage + '%';
+            document.getElementById('progressBarText').textContent = data.percentage + '%';
+            
+            document.getElementById('recordsProcessed').textContent = data.records_processed.toLocaleString();
+            document.getElementById('totalRecords').textContent = data.total_records.toLocaleString();
+            document.getElementById('gpsProcessed').textContent = data.gps_processed + '/' + data.total_gps;
+            document.getElementById('currentGP').textContent = data.current_gp || '--';
+            document.getElementById('duplicatesFound').textContent = data.duplicates_found.toLocaleString();
+            document.getElementById('timeRemaining').textContent = formatTime(data.estimated_seconds_remaining);
+            
+            if (data.status === 'completed' || data.status === 'error') {
+                document.getElementById('progressSpinner').style.display = 'none';
+                enableButtons();
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                    progressInterval = null;
+                }
+            }
+        }
+
+        function startProgressTracking() {
+            showProgress();
+            disableButtons();
+            progressInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/progress-v3`);
+                    const data = await response.json();
+                    updateProgressDisplay(data);
+                } catch (error) {
+                    console.error('Progress tracking error:', error);
+                }
+            }, 500);
+        }
+
+        async function loadGramPanchayats() {
+            const table = document.getElementById('tableSelect').value;
+            const gpColumn = document.getElementById('gpColumn').value;
+            
+            disableButtons();
+            try {
+                const response = await fetch(`${API_BASE}/get-gram-panchayats?table=${table}&gp_column=${gpColumn}`);
+                const data = await response.json();
+                
+                const gpFilter = document.getElementById('gpFilter');
+                gpFilter.innerHTML = '<option value="">All Gram Panchayats</option>';
+                
+                if (data.gram_panchayats) {
+                    data.gram_panchayats.forEach(gp => {
+                        const option = document.createElement('option');
+                        option.value = gp.gp_name;
+                        option.textContent = `${gp.gp_name} (${gp.voter_count} voters)`;
+                        gpFilter.appendChild(option);
+                    });
+                }
+                
+                enableButtons();
+                showAlert(`Loaded ${data.total_gps} Gram Panchayats`, 'success');
+            } catch (error) {
+                enableButtons();
+                showAlert(`Error loading GPs: ${error.message}`, 'error');
+            }
+        }
+
+        async function previewDuplicates() {
+            const table = document.getElementById('tableSelect').value;
+            const gpColumn = document.getElementById('gpColumn').value;
+            const gpFilter = document.getElementById('gpFilter').value;
+            const voterThreshold = document.getElementById('voterThreshold').value;
+            const fatherThreshold = document.getElementById('fatherThreshold').value;
+            const useGender = document.getElementById('useGender').checked;
+            
+            startProgressTracking();
+            
+            try {
+                const response = await fetch(
+                    `${API_BASE}/preview-duplicates-v3?table=${table}&gp_column=${gpColumn}&gp_filter=${gpFilter}&voter_threshold=${voterThreshold}&father_threshold=${fatherThreshold}&use_gender=${useGender}&limit=50`
+                );
+                const data = await response.json();
+                
+                hideProgress();
+                enableButtons();
+                showResults();
+                
+                const statsHtml = `
+                    <div class="stat-card">
+                        <div class="number">${data.total_duplicate_groups}</div>
+                        <div class="label">Duplicate Groups</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.gps_processed}</div>
+                        <div class="label">GPs Processed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.records_analyzed}</div>
+                        <div class="label">Records Analyzed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.voter_threshold}%</div>
+                        <div class="label">Voter Threshold</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.father_threshold}%</div>
+                        <div class="label">Father Threshold</div>
+                    </div>
+                `;
+                document.getElementById('statsContainer').innerHTML = statsHtml;
+                
+                let listHtml = '<h4 style="margin-bottom: 15px;">Duplicate Records Found:</h4>';
+                if (data.data && data.data.length > 0) {
+                    data.data.forEach((group) => {
+                        const primaryGender = group.primary_record.gender || 'UNKNOWN';
+                        const gpName = group.gram_panchayat;
+                        listHtml += `
+                            <div class="duplicate-item">
+                                <div class="primary">
+                                    <strong>Primary Record (ID: ${group.primary_record.id}):</strong>
+                                    <span class="gp-badge">${gpName}</span>
+                                    <span class="gender-badge gender-${primaryGender.toLowerCase()}">${primaryGender}</span>
+                                    <br>
+                                    👤 ${group.primary_record.voter_name}<br>
+                                    👨‍👩‍👦 ${group.primary_record.father_name}
+                                </div>
+                                <div class="duplicates">
+                                    <strong>Duplicates (${group.duplicates.length}):</strong>
+                                    ${group.duplicates.map(dup => {
+                                        const dupGender = dup.gender || 'UNKNOWN';
+                                        return `
+                                        <div class="dup-record" style="padding: 8px; background: white; margin: 5px 0; border-radius: 5px;">
+                                            <strong>ID: ${dup.id}</strong>
+                                            <span class="gender-badge gender-${dupGender.toLowerCase()}">${dupGender}</span>
+                                            <br>
+                                            👤 ${dup.voter_name} <span style="color: #667eea;">(Voter: ${dup.voter_score}%)</span><br>
+                                            👨‍👩‍👦 ${dup.father_name} <span style="color: #11998e;">(Father: ${dup.father_score}%)</span><br>
+                                            <strong>Combined: ${dup.combined_score}%</strong>
+                                        </div>
+                                    `}).join('')}
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    listHtml += '<p>No duplicates found! 🎉</p>';
+                }
+                document.getElementById('duplicateList').innerHTML = listHtml;
+                
+                showAlert(`Found ${data.total_duplicate_groups} duplicate groups across ${data.gps_processed} GPs`, 'success');
+            } catch (error) {
+                hideProgress();
+                enableButtons();
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function runDeduplication() {
+            const table = document.getElementById('tableSelect').value;
+            const gpColumn = document.getElementById('gpColumn').value;
+            const voterThreshold = document.getElementById('voterThreshold').value;
+            const fatherThreshold = document.getElementById('fatherThreshold').value;
+            const useGender = document.getElementById('useGender').checked;
+            const dryRun = document.getElementById('dryRun').checked;
+            
+            const confirmMsg = dryRun 
+                ? 'Run FULL deduplication in DRY RUN mode (GP-by-GP processing)?' 
+                : '⚠️ WARNING: This will PERMANENTLY mark duplicates as INACTIVE. Continue?';
+            
+            if (!confirm(confirmMsg)) return;
+            
+            startProgressTracking();
+            
+            try {
+                const response = await fetch(`${API_BASE}/deduplicate-voters-v3`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        table_name: table,
+                        gp_column: gpColumn,
+                        voter_threshold: parseInt(voterThreshold),
+                        father_threshold: parseInt(fatherThreshold),
+                        use_gender: useGender,
+                        dry_run: dryRun
+                    })
+                });
+                
+                const data = await response.json();
+                hideProgress();
+                enableButtons();
+                showResults();
+                
+                const statsHtml = `
+                    <div class="stat-card">
+                        <div class="number">${data.total_records_processed}</div>
+                        <div class="label">Total Processed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.total_gps_processed}</div>
+                        <div class="label">GPs Processed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.records_to_deactivate}</div>
+                        <div class="label">To Deactivate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.voter_threshold}% / ${data.father_threshold}%</div>
+                        <div class="label">V / F Threshold</div>
+                    </div>
+                `;
+                document.getElementById('statsContainer').innerHTML = statsHtml;
+                
+                const msg = dryRun 
+                    ? `Dry run completed! Found ${data.records_to_deactivate} duplicates across ${data.total_gps_processed} GPs` 
+                    : `Successfully marked ${data.records_to_deactivate} records as INACTIVE`;
+                showAlert(msg, dryRun ? 'warning' : 'success');
+                
+            } catch (error) {
+                hideProgress();
+                enableButtons();
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getStatistics() {
+            const table = document.getElementById('tableSelect').value;
+            const gpColumn = document.getElementById('gpColumn').value;
+            
+            disableButtons();
+            try {
+                const response = await fetch(`${API_BASE}/statistics-v3?table=${table}&gp_column=${gpColumn}`);
+                const data = await response.json();
+                
+                enableButtons();
+                showResults();
+                
+                const statsHtml = `
+                    <div class="stat-card">
+                        <div class="number">${data.total_records.toLocaleString()}</div>
+                        <div class="label">Total Records</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.active_records.toLocaleString()}</div>
+                        <div class="label">Active</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.inactive_records.toLocaleString()}</div>
+                        <div class="label">Inactive</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.duplicate_percentage}%</div>
+                        <div class="label">Duplicates</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${data.total_gram_panchayats}</div>
+                        <div class="label">Total GPs</div>
+                    </div>
+                `;
+                document.getElementById('statsContainer').innerHTML = statsHtml;
+                
+                showAlert('Statistics loaded successfully', 'success');
+            } catch (error) {
+                enableButtons();
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function resetToActive() {
+            const table = document.getElementById('tableSelect').value;
+            
+            if (!confirm('⚠️ WARNING: This will reset ALL records to ACTIVE. Are you sure?')) return;
+            
+            disableButtons();
+            try {
+                const response = await fetch(`${API_BASE}/reset-to-active-v3`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table_name: table })
+                });
+                
+                const data = await response.json();
+                enableButtons();
+                showResults();
+                
+                showAlert(`Successfully reset ${data.records_reset.toLocaleString()} records to ACTIVE`, 'success');
+            } catch (error) {
+                enableButtons();
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        window.onload = function() {
+            console.log('Deduplication Dashboard v3.0 with GP-based grouping loaded!');
+            loadGramPanchayats();
+        };
+    </script>
+</body>
+</html>

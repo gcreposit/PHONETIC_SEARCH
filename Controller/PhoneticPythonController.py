@@ -12,129 +12,6 @@ phonetic_py_bp = Blueprint("phonetic_py_bp", __name__, url_prefix="/api/pysearch
 DB_NAME = os.getenv("DB_NAME")
 
 
-def calculate_best_score(row, q_lat, q_skel, q_meta):
-    """Internal helper to score a row based on multiple fields."""
-    fields_to_check = ["voter_name", "father_husband_mother_name"]
-    best_score = 0
-
-    for field in fields_to_check:
-        val = row.get(field) or ""
-        t_lat, t_skel, t_meta = get_universal_skeleton(val)
-
-        skel_score = 100 if (q_skel == t_skel and q_skel != "") else 0
-        ratio = fuzz.ratio(q_lat, t_lat)
-        partial = fuzz.partial_ratio(q_lat, t_lat)
-        phonetic = (q_meta == t_meta and q_meta != "")
-
-        current_score = (skel_score * 0.4) + (partial * 0.4) + (ratio * 0.1)
-        if phonetic: current_score += 10
-
-        if current_score > best_score:
-            best_score = current_score
-
-    return round(best_score, 2)
-
-
-
-
-
-def calculate_phonetic_score(q_data, t_val):
-    q_lat, q_skel, q_meta = q_data
-    t_lat, t_skel, t_meta = get_universal_skeleton(t_val)
-
-    if not t_lat: return 0
-
-    # PHONETIC MATCH (Huge weight)
-    # If the sound-code matches exactly, it's likely the same name
-    phonetic_match = 100 if (q_meta == t_meta and q_meta != "") else 0
-
-    # CONSONANT MATCH (High weight)
-    # Matches 'vks' (Vikas) with 'bks' (Bikas) after normalization
-    skel_match = 100 if (q_skel == t_skel and q_skel != "") else 0
-
-    # FUZZY MATCH (Token based for name reversals)
-    # Use token_sort_ratio so "Anil Kumar" matches "Kumar Anil"
-    fuzzy_score = fuzz.token_sort_ratio(q_lat, t_lat)
-
-    # FINAL CALCULATION
-    # We prioritize the "Sound" (Phonetic + Skeleton) over the "Spelling" (Fuzzy)
-    score = (phonetic_match * 0.45) + (skel_match * 0.35) + (fuzzy_score * 0.20)
-
-    return round(score, 2)
-
-
-def execute_phonetic_search(table_name, query_text, search_fields):
-    query_list = [q.strip() for q in query_text.split(",") if q.strip()]
-    if not query_list:
-        return []
-
-    # 🔹 Build SQL LIKE filter (broad match)
-    like_conditions = []
-    params = {}
-
-    for i, q in enumerate(query_list):
-        key = f"q{i}"
-        field_conditions = " OR ".join(
-            [f"{field} LIKE :{key}" for field in search_fields]
-        )
-        like_conditions.append(f"({field_conditions})")
-        params[key] = f"%{q}%"
-
-    where_clause = " OR ".join(like_conditions)
-
-    sql = f"""
-        SELECT *
-        FROM {DB_NAME}.{table_name}
-        WHERE {where_clause}
-    """
-
-    result = db.session.execute(text(sql), params)
-    rows = [dict(row._mapping) for row in result]
-
-    if not rows:
-        return []
-
-    # 🔹 Precompute query skeletons
-    query_data = [get_universal_skeleton(q) for q in query_list]
-
-    unique_matches = {}
-
-    for row in rows:
-        row_id = row.get("id")
-        if not row_id:
-            continue
-
-        best_score = 0
-
-        for field in search_fields:
-            val = row.get(field) or ""
-            t_lat, t_skel, t_meta = get_universal_skeleton(val)
-
-            for q_lat, q_skel, q_meta in query_data:
-
-                token_match = any(token in t_lat for token in q_lat.split())
-
-                skel_score = 100 if (q_skel == t_skel and q_skel != "") else 0
-                ratio = fuzz.ratio(q_lat, t_lat)
-                partial = fuzz.partial_ratio(q_lat, t_lat)
-                phonetic = (q_meta == t_meta and q_meta != "")
-
-                score = (skel_score * 0.3) + (partial * 0.5) + (ratio * 0.1)
-
-                if phonetic:
-                    score += 10
-
-                if token_match:
-                    score += 20
-
-                if score > best_score:
-                    best_score = score
-
-        if best_score >= 35:  # 🔥 lower threshold
-            row["match_score"] = round(best_score, 2)
-            unique_matches[row_id] = row
-
-    return sorted(unique_matches.values(), key=lambda x: x["match_score"], reverse=True)
 
 
 # def execute_sequential_search(table_name, query_text, voter_fields, father_fields):
@@ -409,6 +286,131 @@ def search_voter_data():
     })
 
 
+def calculate_best_score(row, q_lat, q_skel, q_meta):
+    """Internal helper to score a row based on multiple fields."""
+    fields_to_check = ["voter_name", "father_husband_mother_name"]
+    best_score = 0
+
+    for field in fields_to_check:
+        val = row.get(field) or ""
+        t_lat, t_skel, t_meta = get_universal_skeleton(val)
+
+        skel_score = 100 if (q_skel == t_skel and q_skel != "") else 0
+        ratio = fuzz.ratio(q_lat, t_lat)
+        partial = fuzz.partial_ratio(q_lat, t_lat)
+        phonetic = (q_meta == t_meta and q_meta != "")
+
+        current_score = (skel_score * 0.4) + (partial * 0.4) + (ratio * 0.1)
+        if phonetic: current_score += 10
+
+        if current_score > best_score:
+            best_score = current_score
+
+    return round(best_score, 2)
+
+
+
+
+
+def calculate_phonetic_score(q_data, t_val):
+    q_lat, q_skel, q_meta = q_data
+    t_lat, t_skel, t_meta = get_universal_skeleton(t_val)
+
+    if not t_lat: return 0
+
+    # PHONETIC MATCH (Huge weight)
+    # If the sound-code matches exactly, it's likely the same name
+    phonetic_match = 100 if (q_meta == t_meta and q_meta != "") else 0
+
+    # CONSONANT MATCH (High weight)
+    # Matches 'vks' (Vikas) with 'bks' (Bikas) after normalization
+    skel_match = 100 if (q_skel == t_skel and q_skel != "") else 0
+
+    # FUZZY MATCH (Token based for name reversals)
+    # Use token_sort_ratio so "Anil Kumar" matches "Kumar Anil"
+    fuzzy_score = fuzz.token_sort_ratio(q_lat, t_lat)
+
+    # FINAL CALCULATION
+    # We prioritize the "Sound" (Phonetic + Skeleton) over the "Spelling" (Fuzzy)
+    score = (phonetic_match * 0.45) + (skel_match * 0.35) + (fuzzy_score * 0.20)
+
+    return round(score, 2)
+
+
+def execute_phonetic_search(table_name, query_text, search_fields):
+    query_list = [q.strip() for q in query_text.split(",") if q.strip()]
+    if not query_list:
+        return []
+
+    # 🔹 Build SQL LIKE filter (broad match)
+    like_conditions = []
+    params = {}
+
+    for i, q in enumerate(query_list):
+        key = f"q{i}"
+        field_conditions = " OR ".join(
+            [f"{field} LIKE :{key}" for field in search_fields]
+        )
+        like_conditions.append(f"({field_conditions})")
+        params[key] = f"%{q}%"
+
+    where_clause = " OR ".join(like_conditions)
+
+    sql = f"""
+        SELECT *
+        FROM {DB_NAME}.{table_name}
+        WHERE {where_clause}
+    """
+
+    result = db.session.execute(text(sql), params)
+    rows = [dict(row._mapping) for row in result]
+
+    if not rows:
+        return []
+
+    # 🔹 Precompute query skeletons
+    query_data = [get_universal_skeleton(q) for q in query_list]
+
+    unique_matches = {}
+
+    for row in rows:
+        row_id = row.get("id")
+        if not row_id:
+            continue
+
+        best_score = 0
+
+        for field in search_fields:
+            val = row.get(field) or ""
+            t_lat, t_skel, t_meta = get_universal_skeleton(val)
+
+            for q_lat, q_skel, q_meta in query_data:
+
+                token_match = any(token in t_lat for token in q_lat.split())
+
+                skel_score = 100 if (q_skel == t_skel and q_skel != "") else 0
+                ratio = fuzz.ratio(q_lat, t_lat)
+                partial = fuzz.partial_ratio(q_lat, t_lat)
+                phonetic = (q_meta == t_meta and q_meta != "")
+
+                score = (skel_score * 0.3) + (partial * 0.5) + (ratio * 0.1)
+
+                if phonetic:
+                    score += 10
+
+                if token_match:
+                    score += 20
+
+                if score > best_score:
+                    best_score = score
+
+        if best_score >= 35:  # 🔥 lower threshold
+            row["match_score"] = round(best_score, 2)
+            unique_matches[row_id] = row
+
+    return sorted(unique_matches.values(), key=lambda x: x["match_score"], reverse=True)
+
+
 @phonetic_py_bp.route("/testing-data", methods=["GET"])
 def search_testing_data():
     q = request.args.get("q", "").strip()
@@ -441,131 +443,191 @@ def search_testing_data():
 
 #=============================================================================================#
 # NEW CODE IMPL #
+# UPDATED: Modified endpoints and functions
 
 @phonetic_py_bp.route("/deduplicate-voters", methods=["POST"])
 def deduplicate_voters():
     """
     Find duplicate voter records based on phonetic matching of:
-    1. voter_name
-    2. father_husband_mother_name
+    1. voter_name (with separate threshold)
+    2. father_husband_mother_name (with separate threshold)
 
     Mark duplicates as INACTIVE in status column
     """
     table_name = request.json.get("table_name", "gram_panchayat_voters")
-    dry_run = request.json.get("dry_run", True)  # Safety: preview before actual update
-    similarity_threshold = request.json.get("threshold", 85)  # Phonetic match threshold
+    dry_run = request.json.get("dry_run", True)
+
+    # 🔥 SEPARATE THRESHOLDS
+    voter_threshold = request.json.get("voter_threshold", 85)
+    father_threshold = request.json.get("father_threshold", 80)
 
     try:
-        # Step 1: Fetch all active voter records
+        pk_column = "id"
+
+        # Fetch all active voter records
         sql = f"""
-            SELECT id, voter_name, father_husband_mother_name, status
+            SELECT {pk_column}, voter_name, father_husband_mother_name, status
             FROM {DB_NAME}.{table_name}
             WHERE status IS NULL OR status != 'INACTIVE'
-            ORDER BY id ASC
+            ORDER BY {pk_column} ASC
         """
 
         result = db.session.execute(text(sql))
         rows = [dict(row._mapping) for row in result]
 
+        # Normalize primary key and handle None values
+        for row in rows:
+            if pk_column != 'id':
+                row['id'] = row.get(pk_column)
+            row['voter_name'] = row.get('voter_name') or ""
+            row['father_husband_mother_name'] = row.get('father_husband_mother_name') or ""
+
         if not rows:
             return jsonify({
+                "success": True,
                 "message": "No active records found",
                 "total_processed": 0,
                 "duplicates_found": 0
             })
 
-        # Step 2: Group records by phonetic similarity
-        duplicate_groups = find_duplicate_groups(rows, similarity_threshold)
+        # 🔥 Use separate thresholds
+        duplicate_groups = find_duplicate_groups_with_separate_thresholds(
+            rows,
+            voter_threshold,
+            father_threshold
+        )
 
-        # Step 3: Prepare update list (keep first, mark rest INACTIVE)
+        # Prepare update list
         records_to_deactivate = []
 
         for group in duplicate_groups:
             if len(group) > 1:
-                # Keep first record (lowest ID), mark rest as duplicates
                 primary_record = group[0]
                 duplicates = group[1:]
 
                 for dup in duplicates:
                     records_to_deactivate.append({
                         "id": dup["id"],
-                        "voter_name": dup["voter_name"],
-                        "father_name": dup["father_husband_mother_name"],
+                        "voter_name": dup["voter_name"] or "(empty)",
+                        "father_name": dup["father_husband_mother_name"] or "(empty)",
                         "duplicate_of": primary_record["id"],
-                        "match_score": dup.get("match_score", 0)
+                        "voter_score": dup.get("voter_score", 0),
+                        "father_score": dup.get("father_score", 0),
+                        "combined_score": dup.get("match_score", 0)
                     })
 
-        # Step 4: Execute updates (if not dry run)
+        # Execute updates (if not dry run)
         if not dry_run and records_to_deactivate:
-            deactivate_duplicate_records(table_name, records_to_deactivate)
+            deactivate_duplicate_records(table_name, pk_column, records_to_deactivate)
 
         return jsonify({
             "success": True,
             "dry_run": dry_run,
+            "voter_threshold": voter_threshold,
+            "father_threshold": father_threshold,
             "total_records_processed": len(rows),
             "duplicate_groups_found": len(duplicate_groups),
             "records_to_deactivate": len(records_to_deactivate),
-            "details": records_to_deactivate[:100],  # Show first 100
+            "details": records_to_deactivate[:100],
             "message": "Dry run completed" if dry_run else "Duplicates marked as INACTIVE"
         })
 
     except Exception as e:
+        import traceback
         return jsonify({
             "error": str(e),
+            "traceback": traceback.format_exc(),
             "success": False
         }), 500
 
 
-
-def cluster_by_similarity(records, threshold):
+@phonetic_py_bp.route("/preview-duplicates", methods=["GET"])
+def preview_duplicates():
     """
-    Clusters records using phonetic + fuzzy matching
-    Returns list of duplicate groups
+    Preview duplicate records without making any changes
     """
-    groups = []
-    processed = set()
+    table_name = request.args.get("table", "gram_panchayat_voters")
+    limit = int(request.args.get("limit", 50))
 
-    for i, rec1 in enumerate(records):
-        if rec1["id"] in processed:
-            continue
+    # 🔥 SEPARATE THRESHOLDS
+    voter_threshold = int(request.args.get("voter_threshold", 85))
+    father_threshold = int(request.args.get("father_threshold", 80))
 
-        current_group = [rec1]
-        processed.add(rec1["id"])
+    try:
+        pk_column = "id"
 
-        for j, rec2 in enumerate(records):
-            if i == j or rec2["id"] in processed:
-                continue
+        sql = f"""
+            SELECT {pk_column}, voter_name, father_husband_mother_name, status
+            FROM {DB_NAME}.{table_name}
+            WHERE status IS NULL OR status != 'INACTIVE'
+            ORDER BY {pk_column} ASC
+            LIMIT 5000
+        """
 
-            # Calculate similarity between rec1 and rec2
-            voter_score = calculate_name_similarity(
-                (rec1["_v_lat"], rec1["_v_skel"], rec1["_v_meta"]),
-                (rec2["_v_lat"], rec2["_v_skel"], rec2["_v_meta"])
-            )
+        result = db.session.execute(text(sql))
+        rows = [dict(row._mapping) for row in result]
 
-            father_score = calculate_name_similarity(
-                (rec1["_f_lat"], rec1["_f_skel"], rec1["_f_meta"]),
-                (rec2["_f_lat"], rec2["_f_skel"], rec2["_f_meta"])
-            )
+        # Normalize
+        for row in rows:
+            if pk_column != 'id':
+                row['id'] = row.get(pk_column)
+            row['voter_name'] = row.get('voter_name') or ""
+            row['father_husband_mother_name'] = row.get('father_husband_mother_name') or ""
 
-            # Both voter and father should match
-            if voter_score >= threshold and father_score >= threshold:
-                rec2["match_score"] = round((voter_score + father_score) / 2, 2)
-                current_group.append(rec2)
-                processed.add(rec2["id"])
+        duplicate_groups = find_duplicate_groups_with_separate_thresholds(
+            rows,
+            voter_threshold,
+            father_threshold
+        )
 
-        if len(current_group) > 1:
-            groups.append(current_group)
+        # Format for viewing
+        preview_data = []
+        for group in duplicate_groups[:limit]:
+            if len(group) > 1:
+                preview_data.append({
+                    "primary_record": {
+                        "id": group[0]["id"],
+                        "voter_name": group[0]["voter_name"] or "(empty)",
+                        "father_name": group[0]["father_husband_mother_name"] or "(empty)"
+                    },
+                    "duplicates": [
+                        {
+                            "id": rec["id"],
+                            "voter_name": rec["voter_name"] or "(empty)",
+                            "father_name": rec["father_husband_mother_name"] or "(empty)",
+                            "voter_score": rec.get("voter_score", 0),
+                            "father_score": rec.get("father_score", 0),
+                            "combined_score": rec.get("match_score", 0)
+                        }
+                        for rec in group[1:]
+                    ]
+                })
 
-    return groups
+        return jsonify({
+            "success": True,
+            "table_name": table_name,
+            "voter_threshold": voter_threshold,
+            "father_threshold": father_threshold,
+            "total_duplicate_groups": len(duplicate_groups),
+            "preview_count": len(preview_data),
+            "data": preview_data
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "success": False
+        }), 500
 
 
-# Replace these 3 functions completely in your PhoneticPythonController.py
-
-def find_duplicate_groups(rows, threshold=85):
+# 🔥 NEW FUNCTION: Separate thresholds for voter and father names
+def find_duplicate_groups_with_separate_thresholds(rows, voter_threshold=85, father_threshold=80):
     """
-    Groups records that are phonetically similar based on:
-    1. voter_name match
-    2. father_husband_mother_name match
+    Groups records using SEPARATE thresholds:
+    1. voter_name must match at voter_threshold
+    2. father_husband_mother_name must match at father_threshold
 
     Returns: List of duplicate groups
     """
@@ -573,11 +635,8 @@ def find_duplicate_groups(rows, threshold=85):
     # Precompute phonetic data for all records
     valid_rows = []
     for row in rows:
-        voter_name = row.get("voter_name") or ""
-        father_name = row.get("father_husband_mother_name") or ""
-
-        voter_name = voter_name.strip() if voter_name else ""
-        father_name = father_name.strip() if father_name else ""
+        voter_name = (row.get('voter_name') or "").strip()
+        father_name = (row.get('father_husband_mother_name') or "").strip()
 
         if not voter_name:
             continue
@@ -595,11 +654,171 @@ def find_duplicate_groups(rows, threshold=85):
 
         valid_rows.append(row)
 
-    # 🔥 Direct comparison without bucketing - more accurate
-    duplicate_groups = cluster_by_similarity(valid_rows, threshold)
+    # Cluster with separate thresholds
+    duplicate_groups = cluster_by_similarity_separate_thresholds(
+        valid_rows,
+        voter_threshold,
+        father_threshold
+    )
 
     return duplicate_groups
 
+
+def cluster_by_similarity_separate_thresholds(records, voter_threshold, father_threshold):
+    """
+    Clusters records using SEPARATE thresholds for voter and father names
+
+    Args:
+        records: List of records with phonetic data
+        voter_threshold: Minimum score for voter name match (0-100)
+        father_threshold: Minimum score for father name match (0-100)
+
+    Returns: List of duplicate groups
+    """
+    groups = []
+    processed = set()
+
+    for i, rec1 in enumerate(records):
+        if rec1["id"] in processed:
+            continue
+
+        current_group = [rec1]
+        processed.add(rec1["id"])
+
+        for j, rec2 in enumerate(records):
+            if i == j or rec2["id"] in processed:
+                continue
+
+            # Calculate similarity scores
+            voter_score = calculate_name_similarity(
+                (rec1["_v_lat"], rec1["_v_skel"], rec1["_v_meta"]),
+                (rec2["_v_lat"], rec2["_v_skel"], rec2["_v_meta"])
+            )
+
+            father_score = calculate_name_similarity(
+                (rec1["_f_lat"], rec1["_f_skel"], rec1["_f_meta"]),
+                (rec2["_f_lat"], rec2["_f_skel"], rec2["_f_meta"])
+            )
+
+            # 🔥 SEPARATE THRESHOLDS: Each must pass its own threshold
+            if voter_score >= voter_threshold and father_score >= father_threshold:
+                rec2["voter_score"] = voter_score
+                rec2["father_score"] = father_score
+                rec2["match_score"] = round((voter_score + father_score) / 2, 2)
+                current_group.append(rec2)
+                processed.add(rec2["id"])
+
+        if len(current_group) > 1:
+            groups.append(current_group)
+
+    return groups
+
+
+# 🔥 ENHANCED: Better phonetic matching for सिंह vs सिहं
+def get_universal_skeleton(text_val):
+    """
+    Enhanced phonetic normalization for Hindi/English names
+    Special handling for common variations like सिंह/सिहं
+    """
+    if not text_val:
+        return "", "", ""
+
+    # 1. Normalize Devanagari
+    norm = text_val.strip().lower()
+
+    # 🔥 Enhanced replacements with more variations
+    replacements = {
+        # Anusvara and Chandrabindu variations
+        'ं': 'n',  # Anusvara
+        'ँ': 'n',  # Chandrabindu
+        'ः': 'h',  # Visarga
+        'ॐ': 'om',  # Om symbol
+
+        # Consonant normalizations
+        'व': 'ब',  # va to ba
+        'श': 'स',  # sha to sa
+        'ष': 'स',  # shha to sa
+        'ण': 'न',  # Na to na
+        'ढ': 'ड',  # dha to da
+        'ढ़': 'ड',  # dha with nukta
+        'ऱ': 'र',  # ra with nukta
+
+        # Latin normalizations
+        'v': 'b',
+        'w': 'b',
+        'sh': 's',
+        'shh': 's',
+        'z': 'j',
+        'ph': 'f',
+        'ee': 'i',
+        'oo': 'u',
+    }
+
+    for old, new in replacements.items():
+        norm = norm.replace(old, new)
+
+    # 2. Transliterate to Latin
+    try:
+        lat = transliterate(norm, sanscript.DEVANAGARI, sanscript.ITRANS).lower()
+    except:
+        lat = norm  # Fallback
+
+    # 🔥 Clean up transliteration artifacts more aggressively
+    lat = lat.replace('~', 'n')  # Tilde from anusvara
+    lat = lat.replace('M', 'n')  # Capital M from anusvara
+    lat = lat.replace('m', 'n')  # lowercase m from anusvara
+    lat = lat.replace('.', '')  # Remove dots
+    lat = lat.replace('H', 'h')  # Normalize H
+    lat = lat.replace('|', '')  # Remove pipe
+
+    # 🔥 Additional normalization for common patterns
+    lat = re.sub(r'n\s*g', 'ng', lat)  # Normalize 'n g' to 'ng'
+    lat = re.sub(r'n\s*h', 'nh', lat)  # Normalize 'n h' to 'nh'
+
+    # 3. Consonant Skeleton
+    skel = re.sub(r'[aeiouy]', '', lat)
+
+    # 4. Double Metaphone
+    meta_primary, meta_secondary = doublemetaphone(lat)
+
+    return lat, skel, meta_primary or ""
+
+
+def deactivate_duplicate_records(table_name, pk_column, records_to_deactivate):
+    """
+    Mark duplicate records as INACTIVE
+    """
+    if not records_to_deactivate:
+        return
+
+    ids_to_deactivate = [rec["id"] for rec in records_to_deactivate]
+    similar_mapping = {rec["id"]: rec["duplicate_of"] for rec in records_to_deactivate}
+
+    # Update in batches
+    batch_size = 1000
+    for i in range(0, len(ids_to_deactivate), batch_size):
+        batch = ids_to_deactivate[i:i + batch_size]
+
+        # Build CASE statement
+        case_statements = []
+        for rec_id in batch:
+            primary_id = similar_mapping[rec_id]
+            case_statements.append(f"WHEN {pk_column} = {rec_id} THEN {primary_id}")
+
+        case_sql = " ".join(case_statements)
+        placeholders = ','.join([str(id) for id in batch])
+
+        sql = f"""
+            UPDATE {DB_NAME}.{table_name}
+            SET status = 'INACTIVE',
+                similar_too = CASE {case_sql} END,
+                check_status = 'DUPLICATE_DETECTED'
+            WHERE {pk_column} IN ({placeholders})
+        """
+
+        db.session.execute(text(sql))
+
+    db.session.commit()
 
 def calculate_name_similarity(q_data, t_data):
     """
@@ -660,275 +879,6 @@ def calculate_name_similarity(q_data, t_data):
     )
 
     return round(score, 2)
-
-
-def get_universal_skeleton(text_val):
-    """
-    Enhanced phonetic normalization for Hindi/English names
-    """
-    if not text_val:
-        return "", "", ""
-
-    # 1. Normalize Devanagari specifically for common sound-alikes
-    norm = text_val.strip().lower()
-
-    # 🔥 Enhanced replacements - handle more variations
-    replacements = {
-        # Anusvara and visarga normalization
-        'ं': 'n',  # Anusvara to 'n'
-        'ँ': 'n',  # Chandrabindu to 'n'
-        'ः': 'h',  # Visarga to 'h'
-        # Consonant normalization
-        'व': 'ब',  # va to ba
-        'श': 'स',  # sha to sa
-        'ष': 'स',  # shha to sa
-        'ण': 'न',  # Na to na
-        'ढ': 'ड',  # dha to da
-        # Latin normalization
-        'v': 'b',
-        'w': 'b',
-        'sh': 's',
-        'shh': 's',
-        'z': 'j',
-        'ph': 'f',
-        'ee': 'i',
-        'oo': 'u',
-    }
-
-    for old, new in replacements.items():
-        norm = norm.replace(old, new)
-
-    # 2. Transliterate to Latin (ITRANS)
-    try:
-        lat = transliterate(norm, sanscript.DEVANAGARI, sanscript.ITRANS).lower()
-    except:
-        lat = norm  # Fallback if transliteration fails
-
-    # Clean up transliteration artifacts
-    lat = lat.replace('~', 'n')  # Handle tilde from anusvara
-    lat = lat.replace('M', 'n')  # Handle capital M from anusvara
-    lat = lat.replace('.', '')  # Remove dots
-
-    # 3. Consonant Skeleton (stripping vowels)
-    skel = re.sub(r'[aeiouy]', '', lat)
-
-    # 4. Double Metaphone (The actual phonetic engine)
-    meta_primary, meta_secondary = doublemetaphone(lat)
-
-    return lat, skel, meta_primary or ""
-
-
-
-
-
-# 🔥 ADD THIS NEW DEBUG ENDPOINT
-@phonetic_py_bp.route("/test-specific", methods=["GET"])
-def test_specific():
-    """Test the specific case you mentioned"""
-    name1_v = "अखिलेश प्रताप सिहं"
-    name1_f = "विजय कुमार सिंह"
-
-    name2_v = "अखिलेश प्रताप सिंह"
-    name2_f = "विजय कुमार सिंह"
-
-    v1_lat, v1_skel, v1_meta = get_universal_skeleton(name1_v)
-    v2_lat, v2_skel, v2_meta = get_universal_skeleton(name2_v)
-
-    f1_lat, f1_skel, f1_meta = get_universal_skeleton(name1_f)
-    f2_lat, f2_skel, f2_meta = get_universal_skeleton(name2_f)
-
-    voter_score = calculate_name_similarity(
-        (v1_lat, v1_skel, v1_meta),
-        (v2_lat, v2_skel, v2_meta)
-    )
-
-    father_score = calculate_name_similarity(
-        (f1_lat, f1_skel, f1_meta),
-        (f2_lat, f2_skel, f2_meta)
-    )
-
-    return jsonify({
-        "test_case": {
-            "voter1": name1_v,
-            "voter2": name2_v,
-            "father1": name1_f,
-            "father2": name2_f
-        },
-        "voter1_phonetics": {
-            "latin": v1_lat,
-            "skeleton": v1_skel,
-            "metaphone": v1_meta
-        },
-        "voter2_phonetics": {
-            "latin": v2_lat,
-            "skeleton": v2_skel,
-            "metaphone": v2_meta
-        },
-        "father1_phonetics": {
-            "latin": f1_lat,
-            "skeleton": f1_skel,
-            "metaphone": f1_meta
-        },
-        "father2_phonetics": {
-            "latin": f2_lat,
-            "skeleton": f2_skel,
-            "metaphone": f2_meta
-        },
-        "scores": {
-            "voter_similarity": voter_score,
-            "father_similarity": father_score,
-            "combined_average": round((voter_score + father_score) / 2, 2)
-        },
-        "matching_results": {
-            "would_match_at_threshold_85": voter_score >= 85 and father_score >= 85,
-            "would_match_at_threshold_80": voter_score >= 80 and father_score >= 80,
-            "would_match_at_threshold_70": voter_score >= 70 and father_score >= 70
-        }
-    })
-
-
-# 🔥 ADD THIS DEBUG ENDPOINT FOR ANY TWO NAMES
-@phonetic_py_bp.route("/debug-phonetic", methods=["GET"])
-def debug_phonetic():
-    """
-    Debug phonetic matching for any two names
-    Usage: /debug-phonetic?name1=राम&name2=Ram
-    """
-    name1 = request.args.get("name1", "")
-    name2 = request.args.get("name2", "")
-
-    if not name1 or not name2:
-        return jsonify({
-            "error": "Please provide both name1 and name2 parameters",
-            "example": "/debug-phonetic?name1=अखिलेश&name2=अकिलेश"
-        }), 400
-
-    lat1, skel1, meta1 = get_universal_skeleton(name1)
-    lat2, skel2, meta2 = get_universal_skeleton(name2)
-
-    similarity_score = calculate_name_similarity(
-        (lat1, skel1, meta1),
-        (lat2, skel2, meta2)
-    )
-
-    return jsonify({
-        "name1": {
-            "original": name1,
-            "latin": lat1,
-            "skeleton": skel1,
-            "metaphone": meta1
-        },
-        "name2": {
-            "original": name2,
-            "latin": lat2,
-            "skeleton": skel2,
-            "metaphone": meta2
-        },
-        "comparison": {
-            "similarity_score": similarity_score,
-            "skeleton_match": skel1 == skel2,
-            "metaphone_match": meta1 == meta2,
-            "would_match_at_85": similarity_score >= 85,
-            "would_match_at_80": similarity_score >= 80,
-            "would_match_at_70": similarity_score >= 70
-        }
-    })
-
-
-def deactivate_duplicate_records(table_name, records_to_deactivate):
-    """
-    Mark duplicate records as INACTIVE
-    Also store reference to primary record in similar_too column
-    """
-    if not records_to_deactivate:
-        return
-
-    # Batch update for efficiency
-    ids_to_deactivate = [rec["id"] for rec in records_to_deactivate]
-
-    # Create a mapping of duplicate_id -> primary_id
-    similar_mapping = {rec["id"]: rec["duplicate_of"] for rec in records_to_deactivate}
-
-    # Update in batches of 1000
-    batch_size = 1000
-    for i in range(0, len(ids_to_deactivate), batch_size):
-        batch = ids_to_deactivate[i:i + batch_size]
-
-        # Build CASE statement for similar_too
-        case_statements = []
-        for rec_id in batch:
-            primary_id = similar_mapping[rec_id]
-            case_statements.append(f"WHEN id = {rec_id} THEN {primary_id}")
-
-        case_sql = " ".join(case_statements)
-
-        sql = f"""
-            UPDATE {DB_NAME}.{table_name}
-            SET status = 'INACTIVE',
-                similar_too = CASE {case_sql} END,
-                check_status = 'DUPLICATE_DETECTED'
-            WHERE id IN :ids
-        """
-
-        db.session.execute(text(sql), {"ids": tuple(batch)})
-
-    db.session.commit()
-
-
-# Additional utility endpoint to preview duplicates before deactivation
-@phonetic_py_bp.route("/preview-duplicates", methods=["GET"])
-def preview_duplicates():
-    """
-    Preview duplicate records without making any changes
-    """
-    table_name = request.args.get("table", "gram_panchayat_voters")
-    limit = int(request.args.get("limit", 50))
-    threshold = int(request.args.get("threshold", 85))
-
-    sql = f"""
-        SELECT id, voter_name, father_husband_mother_name, status
-        FROM {DB_NAME}.{table_name}
-        WHERE status IS NULL OR status != 'INACTIVE'
-        ORDER BY id ASC
-        LIMIT 5000
-    """
-
-    result = db.session.execute(text(sql))
-    rows = [dict(row._mapping) for row in result]
-
-    duplicate_groups = find_duplicate_groups(rows, threshold)
-
-    # Format for easy viewing
-    preview_data = []
-    for group in duplicate_groups[:limit]:
-        if len(group) > 1:
-            preview_data.append({
-                "primary_record": {
-                    "id": group[0]["id"],
-                    "voter_name": group[0]["voter_name"],
-                    "father_name": group[0]["father_husband_mother_name"]
-                },
-                "duplicates": [
-                    {
-                        "id": rec["id"],
-                        "voter_name": rec["voter_name"],
-                        "father_name": rec["father_husband_mother_name"],
-                        "match_score": rec.get("match_score", 0)
-                    }
-                    for rec in group[1:]
-                ]
-            })
-
-    return jsonify({
-        "total_duplicate_groups": len(duplicate_groups),
-        "preview_count": len(preview_data),
-        "threshold_used": threshold,
-        "data": preview_data
-    })
-
-
-# Add this to your phonetic_py_bp routes
-
 
 @phonetic_py_bp.route("/statistics", methods=["GET"])
 def get_statistics():
@@ -1030,7 +980,7 @@ def reset_to_active():
 
 
 # ======================================================================================== #
-# SEPARATE CHEKC CODES
+# SEPARATE CHECK CODES
 
 @phonetic_py_bp.route("/find-duplicate-voter-names", methods=["GET"])
 def find_duplicate_voter_names():
@@ -1308,7 +1258,7 @@ def compare_two_records():
     Compare two specific records by ID
     Useful for manual verification
     """
-    table_name = request.args.get("table", "gram_panchayat_voters")
+    table_name = request.args.get("table", "testing")
     id1 = request.args.get("id1")
     id2 = request.args.get("id2")
 
